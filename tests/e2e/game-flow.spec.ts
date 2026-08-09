@@ -18,7 +18,7 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await page.getByRole("button", { name: "Type" }).click();
   await page.getByLabel("Thiago").fill("10");
   await page.getByLabel("Mario").fill("7");
-  await page.getByRole("button", { name: "Confirm round" }).click();
+  await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();
   await page.reload();
@@ -38,12 +38,12 @@ test("edits and deletes rounds from history", async ({ page }) => {
   await page.getByRole("button", { name: "Type" }).click();
   await page.getByLabel("Ana").fill("4");
   await page.getByLabel("Bia").fill("6");
-  await page.getByRole("button", { name: "Confirm round" }).click();
+  await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
   await page.getByRole("button", { name: "Rounds" }).click();
   await page.getByRole("button", { name: "Edit round 1" }).click();
   await page.getByLabel("Ana").fill("9");
-  await page.getByRole("button", { name: "Confirm round" }).click();
+  await page.getByRole("button", { name: "Confirm round" }).press("Enter");
   await expect(page.getByText("9", { exact: true })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());

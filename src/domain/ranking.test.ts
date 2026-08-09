@@ -25,7 +25,7 @@ describe("ranking", () => {
 
   it("creates localized spoken and shareable text", () => {
     expect(spokenRanking(game, "en")).toContain("1, Ana, 10 points");
-    expect(shareText(game, "en")).toContain("🥇 Bia — 10 points");
+    expect(shareText(game, "en")).toContain("1. Bia — 10 points");
     expect(spokenRanking(game, "pt-BR")).toContain("1, Ana, 10 pontos");
     expect(shareText(game, "pt-BR")).toContain("Resultado da partida");
   });

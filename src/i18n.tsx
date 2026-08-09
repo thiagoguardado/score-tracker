@@ -17,6 +17,7 @@ const englishMessages = {
     english: "English",
     portuguese: "Português",
     close: "Close",
+    back: "Back",
     cancel: "Cancel",
     add: "Add",
     edit: "Edit",
@@ -77,6 +78,8 @@ const englishMessages = {
     finalResult: "Final result",
     keepScreenAwakeOff: "Allow the screen to turn off",
     keepScreenAwakeOn: "Keep the screen awake",
+    screenOn: "Screen on",
+    screenOff: "Screen off",
     ranking: "Ranking",
     rounds: "Rounds",
     players: "Players",
@@ -100,6 +103,8 @@ const englishMessages = {
     talkToScoreboard: "Talk to Scoreboard",
     sayNamesAndScores: "Say names and scores",
     voiceUnavailable: "Voice unavailable in this browser",
+    startVoice: "Start",
+    stopVoice: "Stop",
     type: "Type",
     navigation: "Game navigation",
     finish: "Finish",
@@ -159,14 +164,14 @@ const englishMessages = {
   },
   share: {
     title: "Game result",
-    heading: "🏆 Game result",
+    heading: "Game result",
     roundsPlayed: (count: number) => `${count} ${count === 1 ? "round played" : "rounds played"}`,
   },
 };
 
 const portugueseMessages: Messages = {
   meta: { title: "Placar", description: "Um placar de jogos operado principalmente por voz." },
-  common: { language: "Idioma", english: "English", portuguese: "Português", close: "Fechar", cancel: "Cancelar", add: "Adicionar", edit: "Editar", delete: "Excluir", manual: "Manual", byVoice: "Por voz" },
+  common: { language: "Idioma", english: "English", portuguese: "Português", close: "Fechar", back: "Voltar", cancel: "Cancelar", add: "Adicionar", edit: "Editar", delete: "Excluir", manual: "Manual", byVoice: "Por voz" },
   home: {
     tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores por voz", savedOnDevice: "Salvo neste aparelho", history: "Histórico",
     firstGame: "Sua primeira partida começa aqui", emptyDescription: "Os jogos e todas as rodadas ficam salvos automaticamente neste aparelho.",
@@ -188,14 +193,14 @@ const portugueseMessages: Messages = {
     microphonePermission: "Permita o uso do microfone e verifique se a Siri está ativada.", couldNotHear: "Não consegui ouvir. Você pode tentar novamente ou digitar os nomes.", listening: "Ouvindo…",
   },
   game: {
-    active: "Jogo em andamento", finalResult: "Resultado final", keepScreenAwakeOff: "Permitir que a tela apague", keepScreenAwakeOn: "Manter a tela ligada",
+    active: "Jogo em andamento", finalResult: "Resultado final", keepScreenAwakeOff: "Permitir que a tela apague", keepScreenAwakeOn: "Manter a tela ligada", screenOn: "Tela ligada", screenOff: "Tela desligada",
     ranking: "Ranking", rounds: "Rodadas", players: "Jogadores", roundCount: (count) => `${count} ${count === 1 ? "rodada" : "rodadas"}`, currentRanking: "Ranking atual", leading: "Na liderança",
     noRounds: "Nenhuma rodada ainda", noRoundsDescription: "Use o microfone para lançar os primeiros pontos.", editRoundLabel: (number) => `Editar rodada ${number}`,
     deleteRoundLabel: (number) => `Excluir rodada ${number}`, deleteRoundConfirm: (number) => `Excluir a rodada ${number}? O ranking será recalculado.`,
     playersNote: "Renomear preserva o histórico. Um jogador novo começa com zero nas rodadas anteriores.", playerNameLabel: (name) => `Nome de ${name}`,
     removePlayerLabel: (name) => `Remover ${name}`, removePlayerConfirm: (name) => `Remover ${name}? As pontuações desse jogador serão excluídas desta partida.`,
     newPlayer: "Novo jogador", addPlayer: "Adicionar", shareResult: "Compartilhar resultado", stopEditing: "Encerrar edição", editResult: "Editar resultado",
-    talkToScoreboard: "Falar com o placar", sayNamesAndScores: "Diga os nomes e os pontos", voiceUnavailable: "Voz indisponível neste navegador", type: "Digitar",
+    talkToScoreboard: "Falar com o placar", sayNamesAndScores: "Diga os nomes e os pontos", voiceUnavailable: "Voz indisponível neste navegador", startVoice: "Iniciar", stopVoice: "Parar", type: "Digitar",
     navigation: "Navegação do jogo", finish: "Finalizar", finishConfirm: "Finalizar o jogo e congelar o resultado?", addRound: "Adicionar rodada", editRound: "Editar rodada",
     manualEntry: "Entrada manual", confirmRound: "Confirmar rodada", resultCopied: "Resultado copiado", shareFailed: "Não foi possível compartilhar",
     commandHelpTitle: "Experimente dizer", commandHelp: "“Alex 10, Sam 7” · “ranking” · “repetir última rodada” · “desfazer última rodada” · “finalizar jogo”",
@@ -214,7 +219,7 @@ const portugueseMessages: Messages = {
     unknownGeneral: "Não entendi. Fale os nomes e os pontos, ou peça o ranking.", duplicatePlayer: "Um jogador foi mencionado mais de uma vez.", missingScore: (name) => `Não entendi o valor de ${name}.`,
     noPlayers: "Ainda não há jogadores.", ranking: "Ranking", point: "ponto", points: "pontos",
   },
-  share: { title: "Resultado da partida", heading: "🏆 Resultado da partida", roundsPlayed: (count) => `${count} ${count === 1 ? "rodada jogada" : "rodadas jogadas"}` },
+  share: { title: "Resultado da partida", heading: "Resultado da partida", roundsPlayed: (count) => `${count} ${count === 1 ? "rodada jogada" : "rodadas jogadas"}` },
 };
 
 const MESSAGE_SETS: Record<Locale, Messages> = { en: englishMessages, "pt-BR": portugueseMessages };

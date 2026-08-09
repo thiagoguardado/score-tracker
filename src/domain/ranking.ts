@@ -36,9 +36,8 @@ export function spokenRanking(game: Game, locale: Locale = "en", rounds: Round[]
 
 export function shareText(game: Game, locale: Locale = "en"): string {
   const messages = getMessages(locale);
-  const medal = (position: number) => ({ 1: "🥇", 2: "🥈", 3: "🥉" })[position] ?? `${position}.`;
   const lines = rankingFor(game, game.rounds, locale).map(({ player, position, total }) =>
-    `${medal(position)} ${player.name} — ${total} ${Math.abs(total) === 1 ? messages.voice.point : messages.voice.points}`,
+    `${position}. ${player.name} — ${total} ${Math.abs(total) === 1 ? messages.voice.point : messages.voice.points}`,
   );
   return [messages.share.heading, "", ...lines, "", messages.share.roundsPlayed(game.rounds.length)].join("\n");
 }

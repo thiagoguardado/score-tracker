@@ -15,6 +15,7 @@ The app is English-first and currently includes Brazilian Portuguese. On first u
 - native result sharing with clipboard fallback;
 - installable PWA with offline access to the manual app and saved data;
 - Screen Wake Lock during active games when supported.
+- monochrome, text-only interface with no decorative images or in-app icons.
 
 No persistent action is applied until it is confirmed. Audio is never recorded or stored.
 

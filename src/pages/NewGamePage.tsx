@@ -1,4 +1,3 @@
-import { ArrowLeft, Mic, Plus, Trash2, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
@@ -132,7 +131,7 @@ export default function NewGamePage() {
   return (
     <main className="page setup-page">
       <header className="topbar">
-        <button className="icon-button" aria-label={messages.common.close} onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
+        <button className="text-action" onClick={() => navigate("/")}>{messages.common.back}</button>
         <span>{messages.setup.newGame}</span>
         <LanguageSelect />
       </header>
@@ -142,10 +141,9 @@ export default function NewGamePage() {
         <h1>{messages.setup.registerByVoice}</h1>
         <p>{messages.setup.voiceDescription}</p>
         <button className={`setup-mic ${voiceActive ? "active" : ""}`} onClick={() => void runVoiceSetup()}>
-          <span className="mic-orbit"><Mic size={30} /></span>
           <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
         </button>
-        {!supportsRecognition() && <div className="voice-unavailable"><Volume2 size={18} /> {messages.setup.voiceUnavailable}</div>}
+        {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
       </section>
 
       <section className="manual-setup" aria-labelledby="players-title">
@@ -166,13 +164,11 @@ export default function NewGamePage() {
                   setError("");
                 }}
               />
-              <button className="icon-button danger-subtle" aria-label={messages.setup.removePlayerLabel(index + 1)} disabled={fields.length <= 2} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>
-                <Trash2 size={18} />
-              </button>
+              <button className="text-action danger-subtle" aria-label={messages.setup.removePlayerLabel(index + 1)} disabled={fields.length <= 2} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>{messages.common.delete}</button>
             </div>
           ))}
         </div>
-        <button className="text-button" onClick={() => setFields((current) => [...current, newField()])}><Plus size={18} /> {messages.setup.addPlayer}</button>
+        <button className="text-button" onClick={() => setFields((current) => [...current, newField()])}>{messages.setup.addPlayer}</button>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button" onClick={startManually}>{messages.setup.startGame}</button>
       </section>

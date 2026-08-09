@@ -1,4 +1,3 @@
-import { ArrowRight, Plus, Trash2, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { rankingFor } from "../domain/ranking";
@@ -27,7 +26,6 @@ export default function HomePage() {
   return (
     <main className="page home-page">
       <header className="home-header">
-        <div className="brand-mark" aria-hidden="true"><Trophy size={22} /></div>
         <div>
           <p className="eyebrow">{messages.home.tagline}</p>
           <h1>{messages.meta.title}</h1>
@@ -38,9 +36,8 @@ export default function HomePage() {
       {!storageHealthy && <div className="alert" role="alert">{messages.home.storageError}</div>}
 
       <button className="new-game-card" onClick={() => navigate("/games/new")}>
-        <span className="new-game-icon"><Plus size={28} /></span>
         <span><strong>{messages.home.newGame}</strong><small>{messages.home.newGameSubtitle}</small></span>
-        <ArrowRight size={24} aria-hidden="true" />
+        <span className="text-arrow" aria-hidden="true">→</span>
       </button>
 
       <section className="history-section" aria-labelledby="history-title">
@@ -54,7 +51,6 @@ export default function HomePage() {
 
         {games.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-trophy" aria-hidden="true"><Trophy size={30} /></div>
             <h3>{messages.home.firstGame}</h3>
             <p>{messages.home.emptyDescription}</p>
           </div>
@@ -67,7 +63,6 @@ export default function HomePage() {
               return (
                 <article className="game-card" key={game.id}>
                   <button className="game-card-main" onClick={() => navigate(`/games/${encodeURIComponent(game.id)}`)}>
-                    <span className={`status-dot ${game.status}`} aria-hidden="true" />
                     <span className="game-card-copy">
                       <strong>{date}</strong>
                       <small>{messages.home.gameSummary(game.players.length, game.rounds.length)}</small>
@@ -75,11 +70,9 @@ export default function HomePage() {
                         {game.status === "active" ? messages.home.inProgress : leader ? messages.home.winner(leader.player.name, leader.total) : messages.home.finishedNoRounds}
                       </span>
                     </span>
-                    <ArrowRight size={20} aria-hidden="true" />
+                    <span className="text-arrow" aria-hidden="true">→</span>
                   </button>
-                  <button className="icon-button danger-subtle" aria-label={messages.home.deleteGameLabel(date)} onClick={() => removeGame(game.id)}>
-                    <Trash2 size={18} />
-                  </button>
+                  <button className="text-action danger-subtle" aria-label={messages.home.deleteGameLabel(date)} onClick={() => removeGame(game.id)}>{messages.common.delete}</button>
                 </article>
               );
             })}

@@ -1,7 +1,3 @@
-import {
-  ArrowLeft, Check, ChevronRight, ClipboardList, History, Mic, Moon, Pencil,
-  Plus, Share2, Square, Sun, Trash2, Trophy, Users, X,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
@@ -55,10 +51,9 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="score-form-title">
-        <div className="sheet-handle" />
         <div className="sheet-header">
           <div><p className="eyebrow">{messages.game.manualEntry}</p><h2 id="score-form-title">{title}</h2></div>
-          <button className="icon-button" aria-label={messages.common.close} onClick={onClose}><X size={21} /></button>
+          <button className="text-action" onClick={onClose}>{messages.common.close}</button>
         </div>
         <div className="score-fields">
           {game.players.map((player) => (
@@ -74,7 +69,7 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
             </label>
           ))}
         </div>
-        <button className="primary-button" onClick={() => onSave(scores)}><Check size={19} /> {messages.game.confirmRound}</button>
+        <button className="primary-button" onClick={() => onSave(scores)}>{messages.game.confirmRound}</button>
       </section>
     </div>
   );
@@ -89,7 +84,7 @@ function HistoryPanel({ game, canEdit, updateRound, deleteRound }: {
   const { messages } = useI18n();
   const [editing, setEditing] = useState<Round | null>(null);
   if (game.rounds.length === 0) {
-    return <div className="panel-empty"><History size={28} /><h3>{messages.game.noRounds}</h3><p>{messages.game.noRoundsDescription}</p></div>;
+    return <div className="panel-empty"><h3>{messages.game.noRounds}</h3><p>{messages.game.noRoundsDescription}</p></div>;
   }
   return (
     <div className="round-list">
@@ -100,10 +95,10 @@ function HistoryPanel({ game, canEdit, updateRound, deleteRound }: {
             <div className="round-card-header">
               <div><span className="round-number">R{number}</span><small>{round.source === "voice" ? messages.common.byVoice : messages.common.manual}</small></div>
               {canEdit && <div className="row-actions">
-                <button className="icon-button" aria-label={messages.game.editRoundLabel(number)} onClick={() => setEditing(round)}><Pencil size={17} /></button>
-                <button className="icon-button danger-subtle" aria-label={messages.game.deleteRoundLabel(number)} onClick={() => {
+                <button className="text-action" aria-label={messages.game.editRoundLabel(number)} onClick={() => setEditing(round)}>{messages.common.edit}</button>
+                <button className="text-action danger-subtle" aria-label={messages.game.deleteRoundLabel(number)} onClick={() => {
                   if (window.confirm(messages.game.deleteRoundConfirm(number))) deleteRound(round.id);
-                }}><Trash2 size={17} /></button>
+                }}>{messages.common.delete}</button>
               </div>}
             </div>
             <div className="round-scores">
@@ -158,9 +153,9 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
                 }
               }}
             />
-            {canEdit && <button className="icon-button danger-subtle" aria-label={messages.game.removePlayerLabel(player.name)} disabled={game.players.length <= 2} onClick={() => {
+            {canEdit && <button className="text-action danger-subtle" aria-label={messages.game.removePlayerLabel(player.name)} disabled={game.players.length <= 2} onClick={() => {
               if (window.confirm(messages.game.removePlayerConfirm(player.name))) removePlayer(player.id);
-            }}><Trash2 size={17} /></button>}
+            }}>{messages.common.delete}</button>}
           </div>
         ))}
       </div>
@@ -173,7 +168,7 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
         setNewName("");
       }}>
         <input aria-label={messages.game.newPlayer} placeholder={messages.game.newPlayer} value={newName} onChange={(event) => setNewName(event.target.value)} />
-        <button className="secondary-button" type="submit"><Plus size={18} /> {messages.game.addPlayer}</button>
+        <button className="secondary-button" type="submit">{messages.game.addPlayer}</button>
       </form>}
     </div>
   );
@@ -237,13 +232,13 @@ export default function GamePage() {
   return (
     <main className={`game-page ${game.status === "finished" ? "finished" : ""}`}>
       <header className="game-topbar">
-        <button className="icon-button on-dark" aria-label={messages.home.history} onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
+        <button className="text-action on-dark" onClick={() => navigate("/")}>{messages.home.history}</button>
         <div className="game-title"><small>{game.status === "active" ? messages.game.active : messages.game.finalResult}</small><strong>{formatGameDate(game.startedAt, locale)}</strong></div>
         <div className="game-topbar-actions">
           <LanguageSelect onDark />
           {game.status === "active" && (
             <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? messages.game.keepScreenAwakeOff : messages.game.keepScreenAwakeOn} onClick={() => setWakeEnabled((value) => !value)}>
-              {wakeEnabled ? <Sun size={19} /> : <Moon size={19} />}
+              {wakeEnabled ? messages.game.screenOn : messages.game.screenOff}
             </button>
           )}
         </div>
@@ -252,14 +247,12 @@ export default function GamePage() {
       <section className="scoreboard-shell">
         <div className="scoreboard-heading">
           <div><p className="eyebrow">{messages.game.roundCount(game.rounds.length)}</p><h1>{panelTitle}</h1></div>
-          {game.status === "finished" && <Trophy size={34} className="result-trophy" />}
         </div>
 
         {panel === "ranking" && <div className="ranking-list" aria-label={messages.game.currentRanking}>
           {ranking.map(({ player, total, position }, index) => (
             <article className={`ranking-row place-${position}`} key={player.id}>
               <span className="rank-position">{ordinal(position, locale)}</span>
-              <span className="rank-avatar" aria-hidden="true">{player.name.slice(0, 1).toLocaleUpperCase(locale)}</span>
               <span className="rank-name"><strong>{player.name}</strong>{index === 0 && game.rounds.length > 0 && <small>{messages.game.leading}</small>}</span>
               <strong className="rank-score">{total}</strong>
             </article>
@@ -271,7 +264,7 @@ export default function GamePage() {
 
         {game.status === "active" && panel === "ranking" && <>
           <section className={`voice-card phase-${voice.status.phase}`} aria-live="polite">
-            <div className="voice-status-line"><span className="voice-pulse" /><strong>{currentPhase}</strong></div>
+            <div className="voice-status-line"><strong>{currentPhase}</strong></div>
             <p>{voice.status.message}</p>
             {voice.status.transcript && <blockquote>“{voice.status.transcript}”</blockquote>}
             {voice.status.draftScores && <div className="draft-score-chips">
@@ -285,8 +278,8 @@ export default function GamePage() {
         </>}
 
         {game.status === "finished" && panel === "ranking" && <div className="result-actions">
-          <button className="primary-button" onClick={() => void share()}><Share2 size={19} /> {messages.game.shareResult}</button>
-          <button className="secondary-button" onClick={() => setEditingFinished((value) => !value)}><Pencil size={18} /> {editingFinished ? messages.game.stopEditing : messages.game.editResult}</button>
+          <button className="primary-button" onClick={() => void share()}>{messages.game.shareResult}</button>
+          <button className="secondary-button" onClick={() => setEditingFinished((value) => !value)}>{editingFinished ? messages.game.stopEditing : messages.game.editResult}</button>
         </div>}
       </section>
 
@@ -296,20 +289,19 @@ export default function GamePage() {
           aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onClick={() => { void wake.request(); voice.activate(); }}
         >
-          <span className="mic-rings" aria-hidden="true" />
-          {voiceActive ? <Square size={25} fill="currentColor" /> : <Mic size={31} />}
+          <span>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
         </button>
         <div><strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong><small>{voice.supported ? messages.game.sayNamesAndScores : messages.game.voiceUnavailable}</small></div>
         <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
       </div>}
 
       <nav className="game-nav" aria-label={messages.game.navigation}>
-        <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><Trophy size={20} /><span>{messages.game.ranking}</span></button>
-        <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><ClipboardList size={20} /><span>{messages.game.rounds}</span></button>
-        <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><Users size={20} /><span>{messages.game.players}</span></button>
+        <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><span>{messages.game.ranking}</span></button>
+        <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><span>{messages.game.rounds}</span></button>
+        <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><span>{messages.game.players}</span></button>
         {game.status === "active" && <button className="finish-nav" onClick={() => {
           if (window.confirm(messages.game.finishConfirm)) finishGame(game.id);
-        }}><ChevronRight size={20} /><span>{messages.game.finish}</span></button>}
+        }}><span>{messages.game.finish}</span></button>}
       </nav>
 
       {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}

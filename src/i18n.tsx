@@ -126,6 +126,7 @@ const englishMessages = {
     editRound: "Edit round",
     manualEntry: "Manual entry",
     confirmRound: "Confirm round",
+    toggleScoreSign: (name: string) => `Toggle sign for ${name}'s score`,
     resultCopied: "Result copied",
     shareFailed: "Could not share the result",
     commandHelpTitle: "Try saying",
@@ -229,7 +230,7 @@ const portugueseMessages: Messages = {
     newPlayer: "Novo jogador", addPlayer: "Adicionar", shareResult: "Compartilhar resultado", stopEditing: "Encerrar edição", editResult: "Editar resultado",
     talkToScoreboard: "Falar com o placar", sayNamesAndScores: "Diga os nomes e os pontos", voiceUnavailable: "Voz indisponível neste navegador", startVoice: "Iniciar", stopVoice: "Parar", type: "Digitar",
     navigation: "Navegação do jogo", finish: "Finalizar", finishConfirm: "Finalizar o jogo e congelar o resultado?", addRound: "Adicionar rodada", editRound: "Editar rodada",
-    manualEntry: "Entrada manual", confirmRound: "Confirmar rodada", resultCopied: "Resultado copiado", shareFailed: "Não foi possível compartilhar",
+    manualEntry: "Entrada manual", confirmRound: "Confirmar rodada", toggleScoreSign: (name) => `Alternar o sinal da pontuação de ${name}`, resultCopied: "Resultado copiado", shareFailed: "Não foi possível compartilhar",
     commandHelpTitle: "Experimente dizer", commandHelp: "“Alex 10, Sam 7” · “ranking” · “repetir última rodada” · “desfazer última rodada” · “finalizar jogo”",
   },
   voice: {

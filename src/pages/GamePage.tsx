@@ -68,21 +68,34 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
         </div>
         <div className="score-fields">
           {game.players.map((player) => (
-            <label className="score-field" key={player.id}>
+            <div className="score-field" key={player.id}>
               <span>{player.name}</span>
-              <input
-                inputMode="text"
-                type="text"
-                pattern="-?[0-9]*"
-                autoComplete="off"
-                aria-invalid={!/^-?\d+$/.test(scoreInputs[player.id] ?? "")}
-                value={scoreInputs[player.id]}
-                onChange={(event) => {
-                  const value = event.target.value.trim();
-                  if (/^-?\d*$/.test(value)) setScoreInputs((current) => ({ ...current, [player.id]: value }));
-                }}
-              />
-            </label>
+              <span className="score-input-control">
+                <input
+                  aria-label={player.name}
+                  inputMode="numeric"
+                  type="text"
+                  pattern="-?[0-9]*"
+                  autoComplete="off"
+                  aria-invalid={!/^-?\d+$/.test(scoreInputs[player.id] ?? "")}
+                  value={scoreInputs[player.id]}
+                  onChange={(event) => {
+                    const value = event.target.value.trim();
+                    if (/^-?\d*$/.test(value)) setScoreInputs((current) => ({ ...current, [player.id]: value }));
+                  }}
+                />
+                <button
+                  className="score-sign-button"
+                  type="button"
+                  aria-label={messages.game.toggleScoreSign(player.name)}
+                  onClick={() => setScoreInputs((current) => {
+                    const value = current[player.id] ?? "0";
+                    const next = value.startsWith("-") ? value.slice(1) || "0" : value === "0" ? "-" : `-${value}`;
+                    return { ...current, [player.id]: next };
+                  })}
+                >+/−</button>
+              </span>
+            </div>
           ))}
         </div>
         <button className="primary-button" disabled={!scoresAreValid} onClick={save}>{messages.game.confirmRound}</button>

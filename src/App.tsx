@@ -3,6 +3,7 @@ import { AppProvider } from "./store";
 import HomePage from "./pages/HomePage";
 import NewGamePage from "./pages/NewGamePage";
 import GamePage from "./pages/GamePage";
+import VoiceDiagnosticsPage from "./pages/VoiceDiagnosticsPage";
 import { I18nProvider } from "./i18n";
 import { ThemeProvider } from "./theme";
 
@@ -16,6 +17,7 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/games/new" element={<NewGamePage />} />
               <Route path="/games/:gameId" element={<GamePage />} />
+              <Route path="/voice-diagnostics" element={<VoiceDiagnosticsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </HashRouter>

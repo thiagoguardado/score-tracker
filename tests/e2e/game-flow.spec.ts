@@ -16,8 +16,10 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByText("Try saying")).toBeVisible();
   await expect(page.getByText(/repeat last round/)).toBeVisible();
   await page.getByRole("button", { name: "Type" }).click();
-  await page.getByLabel("Thiago").fill("10");
-  await page.getByLabel("Mario").fill("-7");
+  await page.getByLabel("Thiago", { exact: true }).fill("10");
+  await expect(page.getByLabel("Mario", { exact: true })).toHaveAttribute("inputmode", "numeric");
+  await page.getByLabel("Mario", { exact: true }).fill("7");
+  await page.getByRole("button", { name: "Toggle sign for Mario's score" }).click();
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();
@@ -38,13 +40,13 @@ test("edits and deletes rounds from history", async ({ page }) => {
   await page.getByLabel("Player 2 name").fill("Bia");
   await page.getByRole("button", { name: "Start game" }).click();
   await page.getByRole("button", { name: "Type" }).click();
-  await page.getByLabel("Ana").fill("4");
-  await page.getByLabel("Bia").fill("6");
+  await page.getByLabel("Ana", { exact: true }).fill("4");
+  await page.getByLabel("Bia", { exact: true }).fill("6");
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
   await page.getByRole("button", { name: "Rounds" }).press("Enter");
   await page.getByRole("button", { name: "Edit round 1" }).click();
-  await page.getByLabel("Ana").fill("9");
+  await page.getByLabel("Ana", { exact: true }).fill("9");
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");
   await expect(page.getByText("9", { exact: true })).toBeVisible();
 

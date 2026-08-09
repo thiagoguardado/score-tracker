@@ -79,11 +79,25 @@ export default function NewGamePage() {
     setVoiceActive(true);
     setError("");
     let currentNames = fields.map((field) => field.name.trim()).filter(Boolean);
+    let recognitionRetryAvailable = true;
 
     try {
       while (running.current) {
         setVoiceMessage(messages.setup.listening);
-        const transcript = await listenOnce(locale);
+        let transcript: string;
+        try {
+          transcript = await listenOnce(locale);
+          recognitionRetryAvailable = true;
+        } catch (voiceError) {
+          const code = getSpeechErrorCode(voiceError);
+          const retryable = code === "no-speech" || code === "timed-out" || code === "speech-timeout";
+          if (running.current && recognitionRetryAvailable && retryable) {
+            recognitionRetryAvailable = false;
+            setVoiceMessage(messages.setup.couldNotHear);
+            continue;
+          }
+          throw voiceError;
+        }
         if (!running.current) break;
         setVoiceMessage(`“${transcript}”`);
         const command = parseSetupVoiceCommand(transcript, currentNames.length > 0, locale);
@@ -129,7 +143,8 @@ export default function NewGamePage() {
         await speak(messages.setup.playersSpeech(currentNames), locale);
       }
     } catch (voiceError) {
-      setError(setupSpeechError(getSpeechErrorCode(voiceError), messages));
+      const code = getSpeechErrorCode(voiceError);
+      if (running.current || code !== "aborted") setError(setupSpeechError(code, messages));
     } finally {
       running.current = false;
       stopAudio();

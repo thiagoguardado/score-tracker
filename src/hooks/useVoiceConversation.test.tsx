@@ -56,6 +56,32 @@ describe("useVoiceConversation", () => {
     expect(onAddRound).not.toHaveBeenCalled();
   });
 
+  it("shows a complete draft without reading every score aloud", async () => {
+    vi.mocked(listenOnce)
+      .mockResolvedValueOnce("Alex three and Sam five")
+      .mockResolvedValueOnce("confirm");
+    const onAddRound = vi.fn();
+    const { result } = renderHook(() => useVoiceConversation({ game, locale: "en", onAddRound, onDeleteRound: vi.fn(), onFinish: vi.fn() }));
+
+    act(() => result.current.activate());
+    await waitFor(() => expect(onAddRound).toHaveBeenCalledWith({ alex: 3, sam: 5 }));
+
+    expect(vi.mocked(speak)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(speak).mock.calls[0]?.[0]).toContain("Round saved");
+  });
+
+  it("only speaks the omission warning before confirmation", async () => {
+    vi.mocked(listenOnce)
+      .mockResolvedValueOnce("Alex three")
+      .mockResolvedValueOnce("cancel");
+    const { result } = renderHook(() => useVoiceConversation({ game, locale: "en", onAddRound: vi.fn(), onDeleteRound: vi.fn(), onFinish: vi.fn() }));
+
+    act(() => result.current.activate());
+    await waitFor(() => expect(vi.mocked(speak)).toHaveBeenCalledWith(expect.stringContaining("Sam was not mentioned"), "en"));
+
+    expect(vi.mocked(speak).mock.calls[0]?.[0]).not.toContain("Alex, 3");
+  });
+
   it("uses Portuguese commands when Portuguese is selected", async () => {
     vi.mocked(listenOnce)
       .mockResolvedValueOnce("Alex três e Sam cinco")

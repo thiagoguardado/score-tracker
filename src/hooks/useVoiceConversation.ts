@@ -52,10 +52,20 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     return messages.voice.review(scoreList(game, scores, messages.voice.scoreListSeparator), omitted);
   };
 
+  const omittedText = (omittedNames: string[]): string => {
+    const joinedNames = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(omittedNames);
+    return (omittedNames.length === 1 ? messages.voice.omittedOne(joinedNames) : messages.voice.omittedMany(joinedNames)).trim();
+  };
+
   const hear = async (draftScores?: Record<PlayerId, number>): Promise<string> => {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      updateStatus("listening", attempt === 0 ? messages.voice.listening : messages.voice.listeningAgain, "", draftScores);
+      updateStatus(
+        "listening",
+        attempt === 0 ? messages.voice.listening : messages.voice.listeningAgain,
+        draftScores ? statusRef.current.transcript : "",
+        draftScores,
+      );
       try {
         return await listenOnce(locale, 10_000);
       } catch (error) {
@@ -140,7 +150,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
             pendingScores = { ...pendingScores, [command.playerId]: command.score };
             const correctedName = game.players.find((player) => player.id === command.playerId)?.name;
             omittedNames = omittedNames.filter((name) => name !== correctedName);
-            await say(reviewText(pendingScores, omittedNames), "awaiting-decision", pendingScores);
+            updateStatus("awaiting-decision", messages.voice.roundReady, transcript, pendingScores);
             continue;
           }
           if (command.type === "read-ranking") {
@@ -154,7 +164,8 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
         if (command.type === "draft-round") {
           pendingScores = command.scores;
           omittedNames = command.omitted.map((player) => player.name);
-          await say(reviewText(pendingScores, omittedNames), "awaiting-decision", pendingScores);
+          updateStatus("awaiting-decision", messages.voice.roundReady, transcript, pendingScores);
+          if (omittedNames.length > 0) await say(omittedText(omittedNames), "speaking-review", pendingScores);
           continue;
         }
         if (command.type === "read-ranking") {
@@ -186,7 +197,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
         break;
       }
     } catch (error) {
-      updateStatus("error", friendlyError(error));
+      if (sessionActive.current || getSpeechErrorCode(error) !== "aborted") updateStatus("error", friendlyError(error));
     } finally {
       sessionActive.current = false;
       stopAudio();

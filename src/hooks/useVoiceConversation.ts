@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { spokenRanking } from "../domain/ranking";
 import { parseGameVoiceCommand } from "../domain/voiceParser";
 import { getMessages, type Locale } from "../i18n";
-import { listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
+import { getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase, VoiceStatus } from "../types";
 
 type PendingAction = "undo" | "finish" | null;
@@ -60,7 +60,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
         return await listenOnce(locale, 10_000);
       } catch (error) {
         lastError = error;
-        const code = error instanceof Error ? error.message : "";
+        const code = getSpeechErrorCode(error);
         if (code.includes("not-allowed") || code.includes("service-not-allowed") || code.includes("unavailable")) throw error;
         if (attempt === 0 && sessionActive.current) await say(messages.voice.didNotHear, "speaking-review", draftScores);
       }
@@ -69,10 +69,10 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
   };
 
   const friendlyError = (error: unknown): string => {
-    const code = error instanceof Error ? error.message : "";
-    if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.voice.microphonePermission;
+    const code = getSpeechErrorCode(error);
+    if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.voice.microphonePermissionDiagnostic(code);
     if (code.includes("unavailable")) return messages.voice.unavailableBrowser;
-    return messages.voice.failedSafely;
+    return messages.voice.failedSafelyDiagnostic(code);
   };
 
   const run = useCallback(async () => {

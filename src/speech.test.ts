@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { listenOnce, speak } from "./speech";
+import { getSpeechErrorCode, listenOnce, speak, SpeechRecognitionFailure } from "./speech";
 
 class FakeRecognition {
   lang = "";
@@ -48,6 +48,29 @@ describe("localized speech", () => {
     expect(recognition?.lang).toBe("en-US");
     await expect(listenOnce("pt-BR")).resolves.toBe("test");
     expect(recognition?.lang).toBe("pt-BR");
+  });
+
+  it("preserves the native recognition error code and detail", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    class FailingRecognition extends FakeRecognition {
+      start() {
+        queueMicrotask(() => this.onerror?.({
+          error: "audio-capture",
+          message: "No audio input device",
+        } as SpeechRecognitionErrorEvent));
+      }
+    }
+    window.SpeechRecognition = FailingRecognition as unknown as SpeechRecognitionConstructor;
+
+    const failure = await listenOnce("pt-BR").catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SpeechRecognitionFailure);
+    expect(failure).toMatchObject({ code: "audio-capture", detail: "No audio input device" });
+    expect(getSpeechErrorCode(failure)).toBe("audio-capture");
+    expect(warning).toHaveBeenCalledWith("Speech recognition failed", {
+      code: "audio-capture",
+      detail: "No audio input device",
+    });
   });
 
   it("configures synthesis for the selected language", async () => {

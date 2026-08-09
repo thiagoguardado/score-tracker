@@ -3,6 +3,24 @@ import type { Locale } from "./i18n";
 let activeRecognition: SpeechRecognition | null = null;
 let speakingResolve: (() => void) | null = null;
 
+export class SpeechRecognitionFailure extends Error {
+  readonly code: string;
+  readonly detail: string;
+
+  constructor(code: string, detail = "") {
+    super(code);
+    this.name = "SpeechRecognitionFailure";
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+export function getSpeechErrorCode(error: unknown): string {
+  if (error instanceof SpeechRecognitionFailure) return error.code;
+  if (error instanceof Error && error.message) return error.message;
+  return "speech-error";
+}
+
 const speechLocale = (locale: Locale) => locale === "pt-BR" ? "pt-BR" : "en-US";
 
 export function supportsRecognition(): boolean {
@@ -62,7 +80,11 @@ export function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<string> 
       const result = event.results[event.resultIndex]?.[0]?.transcript ?? "";
       if (result) succeed(result);
     };
-    recognition.onerror = (event) => fail(new Error(event.error || "speech-error"));
+    recognition.onerror = (event) => {
+      const failure = new SpeechRecognitionFailure(event.error || "speech-error", event.message || "");
+      console.warn("Speech recognition failed", { code: failure.code, detail: failure.detail });
+      fail(failure);
+    };
     recognition.onend = () => {
       if (!settled) fail(new Error("speech-no-result"));
     };

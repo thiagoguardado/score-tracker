@@ -4,8 +4,8 @@ import { LanguageSelect } from "../components/LanguageSelect";
 import { ThemeSelect } from "../components/ThemeSelect";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
-import { useI18n } from "../i18n";
-import { listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
+import { useI18n, type Messages } from "../i18n";
+import { getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
@@ -17,6 +17,16 @@ function validNames(fields: NameField[]): string[] | null {
   if (names.length < 2) return null;
   const normalized = names.map(normalizeSpeech);
   return new Set(normalized).size === normalized.length ? names : null;
+}
+
+function setupSpeechError(code: string, messages: Messages): string {
+  if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.setup.permissionSpeechError(code);
+  if (code === "no-speech") return messages.setup.noSpeechError;
+  if (code === "audio-capture") return messages.setup.audioCaptureError;
+  if (code === "network") return messages.setup.networkSpeechError;
+  if (code === "aborted") return messages.setup.interruptedSpeechError;
+  if (code === "language-not-supported") return messages.setup.languageSpeechError;
+  return messages.setup.unknownSpeechError(code);
 }
 
 export default function NewGamePage() {
@@ -119,8 +129,7 @@ export default function NewGamePage() {
         await speak(messages.setup.playersSpeech(currentNames), locale);
       }
     } catch (voiceError) {
-      const code = voiceError instanceof Error ? voiceError.message : "";
-      setError(code.includes("not-allowed") ? messages.setup.microphonePermission : messages.setup.couldNotHear);
+      setError(setupSpeechError(getSpeechErrorCode(voiceError), messages));
     } finally {
       running.current = false;
       stopAudio();

@@ -230,7 +230,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .leader-emoji { margin-right: 5px; font-size: 0.92rem; }
 
 .voice-card { margin-top: 24px; padding: 20px 22px; border: 0; border-radius: var(--radius-medium); background: var(--soft); }
-.voice-card.phase-listening, .voice-card.phase-awaiting-decision { box-shadow: inset 4px 0 var(--ink); }
+.voice-card.phase-starting, .voice-card.phase-listening, .voice-card.phase-awaiting-decision { box-shadow: inset 4px 0 var(--ink); }
 .voice-card.phase-error { padding: 20px 22px; box-shadow: inset 4px 0 var(--ink); }
 .voice-status-line { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .voice-card p { margin: 8px 0 0; color: var(--muted); font-size: 0.83rem; line-height: 1.45; }

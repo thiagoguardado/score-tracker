@@ -17,12 +17,14 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByText(/repeat last round/)).toBeVisible();
   await page.getByRole("button", { name: "Type" }).click();
   await page.getByLabel("Thiago").fill("10");
-  await page.getByLabel("Mario").fill("7");
+  await page.getByLabel("Mario").fill("-7");
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();
+  await expect(page.getByText("-7", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText("10", { exact: true })).toBeVisible();
+  await expect(page.getByText("-7", { exact: true })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Finish" }).press("Enter");

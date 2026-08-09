@@ -34,6 +34,40 @@ export function getSpeechErrorCode(error: unknown): string {
 
 const speechLocale = (locale: Locale) => locale === "pt-BR" ? "pt-BR" : "en-US";
 
+function normalizeRecognitionPhrase(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function preferredTranscript(result: SpeechRecognitionResult, preferredPhrases: string[]): string {
+  const normalizedPhrases = preferredPhrases.map(normalizeRecognitionPhrase).filter(Boolean);
+  let bestTranscript = result[0]?.transcript ?? "";
+  let bestScore = -1;
+  const alternativeCount = result.length || 1;
+
+  for (let index = 0; index < alternativeCount; index += 1) {
+    const candidate = result[index]?.transcript ?? "";
+    const padded = ` ${normalizeRecognitionPhrase(candidate)} `;
+    const score = normalizedPhrases.filter((phrase) => padded.includes(` ${phrase} `)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestTranscript = candidate;
+    }
+  }
+  return bestTranscript;
+}
+
+export function requiresUserGestureBetweenRecognitions(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 export function supportsRecognition(): boolean {
   return typeof window !== "undefined" && Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
 }
@@ -49,7 +83,12 @@ export function stopAudio(): void {
   speakingResolve = null;
 }
 
-export async function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<string> {
+export async function listenOnce(
+  locale: Locale,
+  timeoutMs = 10_000,
+  preferredPhrases: string[] = [],
+  onCaptureStart?: () => void,
+): Promise<string> {
   if (activeRecognition) {
     const previous = activeRecognition;
     previous.cancel(new SpeechRecognitionFailure("aborted"));
@@ -67,7 +106,7 @@ export async function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<st
     recognition.lang = speechLocale(locale);
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = preferredPhrases.length > 0 ? 5 : 1;
     let settled = false;
     let transcript = "";
     let terminalError: Error | null = null;
@@ -142,7 +181,10 @@ export async function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<st
     armTimeout(timeoutMs);
 
     recognition.onstart = () => armTimeout(timeoutMs);
-    recognition.onaudiostart = () => armTimeout(timeoutMs);
+    recognition.onaudiostart = () => {
+      armTimeout(timeoutMs);
+      onCaptureStart?.();
+    };
     recognition.onsoundstart = () => armTimeout(MAX_UTTERANCE_MS);
     recognition.onspeechstart = () => armTimeout(MAX_UTTERANCE_MS);
     recognition.onspeechend = () => {
@@ -156,7 +198,8 @@ export async function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<st
     };
 
     recognition.onresult = (event) => {
-      const result = event.results[event.resultIndex]?.[0]?.transcript ?? "";
+      const recognitionResult = event.results[event.resultIndex];
+      const result = recognitionResult ? preferredTranscript(recognitionResult, preferredPhrases) : "";
       if (!result) return;
       transcript = result;
       terminalError = null;

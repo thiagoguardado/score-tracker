@@ -34,6 +34,7 @@ export type RankingEntry = {
 
 export type VoicePhase =
   | "idle"
+  | "starting"
   | "listening"
   | "parsing"
   | "speaking-review"

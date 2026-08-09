@@ -25,6 +25,7 @@ function ordinal(position: number, locale: Locale): string {
 function phaseLabel(phase: VoicePhase, messages: Messages): string {
   const labels: Record<VoicePhase, string> = {
     idle: messages.voice.phase.idle,
+    starting: messages.voice.phase.starting,
     listening: messages.voice.phase.listening,
     parsing: messages.voice.phase.parsing,
     "speaking-review": messages.voice.phase.speakingReview,
@@ -40,6 +41,10 @@ function scoreRecord(game: Game, initial?: Record<PlayerId, number>): Record<Pla
   return Object.fromEntries(game.players.map((player) => [player.id, initial?.[player.id] ?? 0]));
 }
 
+function scoreInputRecord(game: Game, initial?: Record<PlayerId, number>): Record<PlayerId, string> {
+  return Object.fromEntries(Object.entries(scoreRecord(game, initial)).map(([playerId, score]) => [playerId, String(score)]));
+}
+
 function ScoreForm({ game, initial, title, onSave, onClose }: {
   game: Game;
   initial?: Record<PlayerId, number>;
@@ -48,7 +53,12 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
   onClose: () => void;
 }) {
   const { messages } = useI18n();
-  const [scores, setScores] = useState(() => scoreRecord(game, initial));
+  const [scoreInputs, setScoreInputs] = useState(() => scoreInputRecord(game, initial));
+  const scoresAreValid = game.players.every((player) => /^-?\d+$/.test(scoreInputs[player.id] ?? ""));
+  const save = () => {
+    if (!scoresAreValid) return;
+    onSave(Object.fromEntries(game.players.map((player) => [player.id, Number.parseInt(scoreInputs[player.id], 10)])));
+  };
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="score-form-title">
@@ -61,16 +71,21 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
             <label className="score-field" key={player.id}>
               <span>{player.name}</span>
               <input
-                inputMode="numeric"
-                type="number"
-                step="1"
-                value={scores[player.id]}
-                onChange={(event) => setScores((current) => ({ ...current, [player.id]: Number.parseInt(event.target.value || "0", 10) }))}
+                inputMode="text"
+                type="text"
+                pattern="-?[0-9]*"
+                autoComplete="off"
+                aria-invalid={!/^-?\d+$/.test(scoreInputs[player.id] ?? "")}
+                value={scoreInputs[player.id]}
+                onChange={(event) => {
+                  const value = event.target.value.trim();
+                  if (/^-?\d*$/.test(value)) setScoreInputs((current) => ({ ...current, [player.id]: value }));
+                }}
               />
             </label>
           ))}
         </div>
-        <button className="primary-button" onClick={() => onSave(scores)}>{messages.game.confirmRound}</button>
+        <button className="primary-button" disabled={!scoresAreValid} onClick={save}>{messages.game.confirmRound}</button>
       </section>
     </div>
   );
@@ -204,7 +219,7 @@ export default function GamePage() {
 
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
-  const voiceActive = voice.status.phase !== "idle" && voice.status.phase !== "error";
+  const voiceActive = !voice.waitingForTap && voice.status.phase !== "idle" && voice.status.phase !== "error";
 
   const share = async () => {
     const text = shareText(game, locale);

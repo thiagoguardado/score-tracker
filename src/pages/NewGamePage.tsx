@@ -5,7 +5,7 @@ import { ThemeSelect } from "../components/ThemeSelect";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
-import { getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
+import { getSpeechErrorCode, listenOnce, requiresUserGestureBetweenRecognitions, speak, stopAudio, supportsRecognition } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
@@ -80,18 +80,26 @@ export default function NewGamePage() {
     setError("");
     let currentNames = fields.map((field) => field.name.trim()).filter(Boolean);
     let recognitionRetryAvailable = true;
+    let capturesThisActivation = 0;
+    let pausedForGesture = false;
 
     try {
       while (running.current) {
-        setVoiceMessage(messages.setup.listening);
+        if (capturesThisActivation > 0 && requiresUserGestureBetweenRecognitions()) {
+          pausedForGesture = true;
+          setVoiceMessage(messages.setup.tapToContinue);
+          break;
+        }
+        setVoiceMessage(messages.setup.startingMicrophone);
         let transcript: string;
         try {
-          transcript = await listenOnce(locale);
+          transcript = await listenOnce(locale, 10_000, [], () => setVoiceMessage(messages.setup.listening));
+          capturesThisActivation += 1;
           recognitionRetryAvailable = true;
         } catch (voiceError) {
           const code = getSpeechErrorCode(voiceError);
           const retryable = code === "no-speech" || code === "timed-out" || code === "speech-timeout";
-          if (running.current && recognitionRetryAvailable && retryable) {
+          if (running.current && recognitionRetryAvailable && retryable && !requiresUserGestureBetweenRecognitions()) {
             recognitionRetryAvailable = false;
             setVoiceMessage(messages.setup.couldNotHear);
             continue;
@@ -149,7 +157,7 @@ export default function NewGamePage() {
       running.current = false;
       stopAudio();
       setVoiceActive(false);
-      setVoiceMessage(messages.setup.namesHint);
+      setVoiceMessage(pausedForGesture ? messages.setup.tapToContinue : messages.setup.namesHint);
     }
   };
 

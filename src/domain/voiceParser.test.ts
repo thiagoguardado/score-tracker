@@ -21,6 +21,13 @@ describe("parseGameVoiceCommand", () => {
     expect(command).toMatchObject({ type: "draft-round", scores: { thiago: 0, mario: 7, paula: 0, tomas: 19 } });
   });
 
+  it("associates an accented Portuguese player with a digit score", () => {
+    expect(parseGameVoiceCommand("Mario 5", players, false, "pt-BR")).toMatchObject({
+      type: "draft-round",
+      scores: { mario: 5 },
+    });
+  });
+
   it("corrects an English pending score", () => {
     expect(parseGameVoiceCommand("Correct Mário to minus twelve", players, true, "en")).toEqual({
       type: "correct-score", playerId: "mario", score: -12,

@@ -120,6 +120,32 @@ describe("localized speech", () => {
     expect(maximumActive).toBe(1);
   });
 
+  it("prefers an alternative transcript containing a known player name", async () => {
+    let recognition: FakeRecognition | undefined;
+    class AlternativeRecognition extends FakeRecognition {
+      constructor() {
+        super();
+        recognition = this;
+      }
+      start() {
+        queueMicrotask(() => this.onresult?.({
+          resultIndex: 0,
+          results: {
+            0: {
+              0: { transcript: "Maria cinco" },
+              1: { transcript: "Mário cinco" },
+              length: 2,
+            },
+          },
+        } as unknown as SpeechRecognitionEvent));
+      }
+    }
+    window.SpeechRecognition = AlternativeRecognition as unknown as SpeechRecognitionConstructor;
+
+    await expect(listenOnce("pt-BR", 10_000, ["Mário"])).resolves.toBe("Mário cinco");
+    expect(recognition?.maxAlternatives).toBe(5);
+  });
+
   it("does not time out a long utterance after speech has started", async () => {
     vi.useFakeTimers();
     class LongRecognition extends FakeRecognition {

@@ -1,6 +1,6 @@
 Add-Type -AssemblyName System.Drawing
 
-function New-PlacarIcon {
+function New-ScoreboardIcon {
     param([int]$Size, [string]$OutputPath)
 
     $bitmap = New-Object System.Drawing.Bitmap($Size, $Size)
@@ -36,6 +36,6 @@ function New-PlacarIcon {
     $bitmap.Dispose()
 }
 
-New-PlacarIcon -Size 192 -OutputPath (Join-Path $PSScriptRoot '..\public\pwa-192.png')
-New-PlacarIcon -Size 512 -OutputPath (Join-Path $PSScriptRoot '..\public\pwa-512.png')
-New-PlacarIcon -Size 180 -OutputPath (Join-Path $PSScriptRoot '..\public\apple-touch-icon.png')
+New-ScoreboardIcon -Size 192 -OutputPath (Join-Path $PSScriptRoot '..\public\pwa-192.png')
+New-ScoreboardIcon -Size 512 -OutputPath (Join-Path $PSScriptRoot '..\public\pwa-512.png')
+New-ScoreboardIcon -Size 180 -OutputPath (Join-Path $PSScriptRoot '..\public\apple-touch-icon.png')

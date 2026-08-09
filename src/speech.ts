@@ -1,5 +1,9 @@
+import type { Locale } from "./i18n";
+
 let activeRecognition: SpeechRecognition | null = null;
 let speakingResolve: (() => void) | null = null;
+
+const speechLocale = (locale: Locale) => locale === "pt-BR" ? "pt-BR" : "en-US";
 
 export function supportsRecognition(): boolean {
   return typeof window !== "undefined" && Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
@@ -17,7 +21,7 @@ export function stopAudio(): void {
   speakingResolve = null;
 }
 
-export function listenOnce(timeoutMs = 10_000): Promise<string> {
+export function listenOnce(locale: Locale, timeoutMs = 10_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Recognition) {
@@ -27,7 +31,7 @@ export function listenOnce(timeoutMs = 10_000): Promise<string> {
 
     const recognition = new Recognition();
     activeRecognition = recognition;
-    recognition.lang = "pt-BR";
+    recognition.lang = speechLocale(locale);
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -71,7 +75,7 @@ export function listenOnce(timeoutMs = 10_000): Promise<string> {
   });
 }
 
-export function speak(text: string): Promise<void> {
+export function speak(text: string, locale: Locale): Promise<void> {
   return new Promise((resolve) => {
     if (!supportsSynthesis()) {
       resolve();
@@ -79,11 +83,12 @@ export function speak(text: string): Promise<void> {
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "pt-BR";
+    const language = speechLocale(locale);
+    utterance.lang = language;
     utterance.rate = 1.05;
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find((voice) => voice.lang.toLocaleLowerCase().startsWith("pt-br"))
-      ?? voices.find((voice) => voice.lang.toLocaleLowerCase().startsWith("pt"));
+    const preferred = voices.find((voice) => voice.lang.toLocaleLowerCase() === language.toLocaleLowerCase())
+      ?? voices.find((voice) => voice.lang.toLocaleLowerCase().startsWith(language.slice(0, 2).toLocaleLowerCase()));
     if (preferred) utterance.voice = preferred;
 
     let done = false;

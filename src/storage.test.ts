@@ -7,7 +7,7 @@ describe("storage", () => {
     expect(loadState()).toEqual(EMPTY_STATE);
   });
 
-  it("preserva uma cópia de recuperação quando o estado está inválido", () => {
+  it("preserves a recovery copy when stored state is invalid", () => {
     window.localStorage.setItem(STORAGE_KEY, "{invalido");
     expect(loadState()).toEqual(EMPTY_STATE);
     expect(Object.keys(window.localStorage).some((key) => key.startsWith("score-tracker:recovery:"))).toBe(true);

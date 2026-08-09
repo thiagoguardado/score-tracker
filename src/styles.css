@@ -39,6 +39,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(232, 169, 74
 button:disabled { cursor: not-allowed; opacity: 0.42; }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { letter-spacing: -0.035em; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.language-select { display: inline-flex; min-height: 40px; align-items: center; gap: 4px; margin-left: auto; padding: 0 7px 0 9px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink-muted); background: var(--paper); }
+.language-select select { min-height: 38px; padding: 0 3px; border: 0; color: inherit; background: transparent; font-size: 0.76rem; font-weight: 900; cursor: pointer; }
+.language-select.on-dark { border-color: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.09); }
+.language-select.on-dark select { color: white; }
+.language-select.on-dark option { color: #17342d; background: white; }
 
 .page {
   width: min(100%, 720px);
@@ -164,7 +171,9 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted); box-shadow: 0 0 0 5px rgba(108, 122, 116, 0.12); }
 .status-dot.active { background: #31a06b; box-shadow: 0 0 0 5px rgba(49, 160, 107, 0.14); }
 
-.topbar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; margin-bottom: 30px; text-align: center; font-weight: 800; }
+.topbar { display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; margin-bottom: 30px; text-align: center; font-weight: 800; }
+.topbar > .icon-button { justify-self: start; }
+.topbar > .language-select { justify-self: end; }
 .topbar-spacer { width: 44px; }
 .setup-hero { text-align: center; }
 .setup-hero h1 { margin-bottom: 10px; font-size: clamp(2.3rem, 10vw, 3.4rem); }
@@ -203,7 +212,8 @@ input { min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(-
 .manual-setup .text-button { margin: 10px 0 20px 41px; }
 
 .game-page { min-height: 100vh; padding-top: env(safe-area-inset-top); color: white; background: var(--forest); }
-.game-topbar { display: grid; width: min(100%, 760px); grid-template-columns: 44px 1fr 44px; align-items: center; gap: 10px; margin: 0 auto; padding: 14px max(18px, env(safe-area-inset-right)) 18px max(18px, env(safe-area-inset-left)); }
+.game-topbar { display: grid; width: min(100%, 760px); grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; margin: 0 auto; padding: 14px max(18px, env(safe-area-inset-right)) 18px max(18px, env(safe-area-inset-left)); }
+.game-topbar-actions { display: flex; align-items: center; gap: 6px; }
 .game-title { min-width: 0; text-align: center; }
 .game-title small, .game-title strong { display: block; }
 .game-title small { color: rgba(255, 255, 255, 0.58); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -250,6 +260,8 @@ input { min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(-
 .draft-score-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .draft-score-chips span { padding: 6px 9px; border-radius: 9px; background: white; font-size: 0.75rem; }
 .draft-score-chips strong { margin-left: 4px; }
+.command-help { display: grid; gap: 4px; margin-top: 10px; padding: 0 6px; color: var(--ink-muted); font-size: 0.72rem; line-height: 1.45; }
+.command-help strong { color: var(--ink); font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; }
 
 .voice-dock { position: fixed; z-index: 20; right: 12px; bottom: calc(78px + env(safe-area-inset-bottom)); left: 12px; display: grid; max-width: 650px; min-height: 79px; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin: auto; padding: 10px 13px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 25px; color: white; background: rgba(13, 46, 39, 0.94); box-shadow: 0 16px 42px rgba(13, 46, 39, 0.3); backdrop-filter: blur(14px); }
 .voice-dock strong, .voice-dock small { display: block; }

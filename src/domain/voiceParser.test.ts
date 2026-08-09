@@ -10,47 +10,57 @@ const players: Player[] = [
 ];
 
 describe("parseGameVoiceCommand", () => {
-  it("monta uma rodada e preenche ausentes com zero", () => {
-    const command = parseGameVoiceCommand("Thiago zero, Mário sete e Tomás dezenove", players, false);
-    expect(command).toMatchObject({
-      type: "draft-round",
-      scores: { thiago: 0, mario: 7, paula: 0, tomas: 19 },
-    });
+  it("builds an English round and fills omitted players with zero", () => {
+    const command = parseGameVoiceCommand("Thiago zero, Mário seven and Tomás nineteen", players, false, "en");
+    expect(command).toMatchObject({ type: "draft-round", scores: { thiago: 0, mario: 7, paula: 0, tomas: 19 } });
     if (command.type === "draft-round") expect(command.omitted.map((player) => player.name)).toEqual(["Paula"]);
   });
 
-  it("corrige um valor na rodada pendente", () => {
-    expect(parseGameVoiceCommand("Corrigir Mário para menos doze", players, true)).toEqual({
-      type: "correct-score",
-      playerId: "mario",
-      score: -12,
+  it("builds a Portuguese round and fills omitted players with zero", () => {
+    const command = parseGameVoiceCommand("Thiago zero, Mário sete e Tomás dezenove", players, false, "pt-BR");
+    expect(command).toMatchObject({ type: "draft-round", scores: { thiago: 0, mario: 7, paula: 0, tomas: 19 } });
+  });
+
+  it("corrects an English pending score", () => {
+    expect(parseGameVoiceCommand("Correct Mário to minus twelve", players, true, "en")).toEqual({
+      type: "correct-score", playerId: "mario", score: -12,
+    });
+  });
+
+  it("corrects a Portuguese pending score", () => {
+    expect(parseGameVoiceCommand("Corrigir Mário para menos doze", players, true, "pt-BR")).toEqual({
+      type: "correct-score", playerId: "mario", score: -12,
     });
   });
 
   it.each([
-    ["quem está ganhando", "read-ranking"],
-    ["desfazer a última rodada", "undo-last-round"],
-    ["finalizar jogo", "finish-game"],
-    ["aprovar", "confirm"],
-  ])("entende o comando %s", (speech, type) => {
-    expect(parseGameVoiceCommand(speech, players, false).type).toBe(type);
+    ["who is winning", "read-ranking"],
+    ["undo the last round", "undo-last-round"],
+    ["finish game", "finish-game"],
+    ["approve", "confirm"],
+  ])("understands the English command %s", (speech, type) => {
+    expect(parseGameVoiceCommand(speech, players, false, "en").type).toBe(type);
   });
 
-  it("entende uma rodada específica", () => {
-    expect(parseGameVoiceCommand("repetir a rodada três", players, false)).toEqual({ type: "read-round", roundNumber: 3 });
+  it("reads a numbered round in both languages", () => {
+    expect(parseGameVoiceCommand("repeat round three", players, false, "en")).toEqual({ type: "read-round", roundNumber: 3 });
+    expect(parseGameVoiceCommand("repetir a rodada três", players, false, "pt-BR")).toEqual({ type: "read-round", roundNumber: 3 });
   });
 });
 
-describe("setup por voz", () => {
-  it("separa nomes mesmo quando a transcrição não inclui vírgulas", () => {
-    expect(parsePlayerNames("Thiago Mário Paula e Tomás")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
+describe("voice player setup", () => {
+  it("splits English names with or without commas", () => {
+    expect(parsePlayerNames("Thiago Mário Paula and Tomás", "en")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
+    expect(parsePlayerNames("Thiago, Mário, Paula and Tomás", "en")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
   });
 
-  it("separa também a conjunção depois da última vírgula", () => {
-    expect(parsePlayerNames("Thiago, Mário, Paula e Tomás")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
+  it("splits Portuguese names with or without commas", () => {
+    expect(parsePlayerNames("Thiago Mário Paula e Tomás", "pt-BR")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
+    expect(parsePlayerNames("Thiago, Mário, Paula e Tomás", "pt-BR")).toEqual(["Thiago", "Mário", "Paula", "Tomás"]);
   });
 
-  it("interpreta correção de nome", () => {
-    expect(parseSetupVoiceCommand("corrigir Mario para Mário", true)).toEqual({ type: "rename", from: "Mario", to: "Mário" });
+  it("renames a player in both languages", () => {
+    expect(parseSetupVoiceCommand("rename Mario to Mário", true, "en")).toEqual({ type: "rename", from: "Mario", to: "Mário" });
+    expect(parseSetupVoiceCommand("corrigir Mario para Mário", true, "pt-BR")).toEqual({ type: "rename", from: "Mario", to: "Mário" });
   });
 });

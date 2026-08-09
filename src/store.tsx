@@ -107,6 +107,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 export function useAppStore(): StoreValue {
   const value = useContext(StoreContext);
-  if (!value) throw new Error("useAppStore precisa estar dentro de AppProvider");
+  if (!value) throw new Error("useAppStore must be used within AppProvider");
   return value;
 }

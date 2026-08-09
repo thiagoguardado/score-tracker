@@ -4,27 +4,39 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { LanguageSelect } from "../components/LanguageSelect";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
 import { useWakeLock } from "../hooks/useWakeLock";
+import { useI18n, type Locale, type Messages } from "../i18n";
 import { useAppStore } from "../store";
 import type { Game, PlayerId, Round, VoicePhase } from "../types";
 
 type Panel = "ranking" | "history" | "players";
 
-const phaseCopy: Record<VoicePhase, string> = {
-  idle: "Pronto para ouvir",
-  listening: "Ouvindo",
-  parsing: "Conferindo",
-  "speaking-review": "Falando",
-  "awaiting-decision": "Aguardando confirmação",
-  applying: "Salvando",
-  "speaking-ranking": "Lendo ranking",
-  error: "A voz precisa de atenção",
-};
+function formatGameDate(value: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
 
-function formatGameDate(value: string): string {
-  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+function ordinal(position: number, locale: Locale): string {
+  if (locale === "pt-BR") return `${position}º`;
+  const suffix = position % 100 >= 11 && position % 100 <= 13 ? "th"
+    : position % 10 === 1 ? "st" : position % 10 === 2 ? "nd" : position % 10 === 3 ? "rd" : "th";
+  return `${position}${suffix}`;
+}
+
+function phaseLabel(phase: VoicePhase, messages: Messages): string {
+  const labels: Record<VoicePhase, string> = {
+    idle: messages.voice.phase.idle,
+    listening: messages.voice.phase.listening,
+    parsing: messages.voice.phase.parsing,
+    "speaking-review": messages.voice.phase.speakingReview,
+    "awaiting-decision": messages.voice.phase.awaitingDecision,
+    applying: messages.voice.phase.applying,
+    "speaking-ranking": messages.voice.phase.speakingRanking,
+    error: messages.voice.phase.error,
+  };
+  return labels[phase];
 }
 
 function scoreRecord(game: Game, initial?: Record<PlayerId, number>): Record<PlayerId, number> {
@@ -38,14 +50,15 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
   onSave: (scores: Record<PlayerId, number>) => void;
   onClose: () => void;
 }) {
+  const { messages } = useI18n();
   const [scores, setScores] = useState(() => scoreRecord(game, initial));
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="score-form-title">
         <div className="sheet-handle" />
         <div className="sheet-header">
-          <div><p className="eyebrow">Entrada manual</p><h2 id="score-form-title">{title}</h2></div>
-          <button className="icon-button" aria-label="Fechar" onClick={onClose}><X size={21} /></button>
+          <div><p className="eyebrow">{messages.game.manualEntry}</p><h2 id="score-form-title">{title}</h2></div>
+          <button className="icon-button" aria-label={messages.common.close} onClick={onClose}><X size={21} /></button>
         </div>
         <div className="score-fields">
           {game.players.map((player) => (
@@ -61,7 +74,7 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
             </label>
           ))}
         </div>
-        <button className="primary-button" onClick={() => onSave(scores)}><Check size={19} /> Confirmar rodada</button>
+        <button className="primary-button" onClick={() => onSave(scores)}><Check size={19} /> {messages.game.confirmRound}</button>
       </section>
     </div>
   );
@@ -73,9 +86,10 @@ function HistoryPanel({ game, canEdit, updateRound, deleteRound }: {
   updateRound: (roundId: string, scores: Record<PlayerId, number>) => void;
   deleteRound: (roundId: string) => void;
 }) {
+  const { messages } = useI18n();
   const [editing, setEditing] = useState<Round | null>(null);
   if (game.rounds.length === 0) {
-    return <div className="panel-empty"><History size={28} /><h3>Nenhuma rodada ainda</h3><p>Use o microfone para lançar os primeiros pontos.</p></div>;
+    return <div className="panel-empty"><History size={28} /><h3>{messages.game.noRounds}</h3><p>{messages.game.noRoundsDescription}</p></div>;
   }
   return (
     <div className="round-list">
@@ -84,11 +98,11 @@ function HistoryPanel({ game, canEdit, updateRound, deleteRound }: {
         return (
           <article className="round-card" key={round.id}>
             <div className="round-card-header">
-              <div><span className="round-number">R{number}</span><small>{round.source === "voice" ? "Por voz" : "Manual"}</small></div>
+              <div><span className="round-number">R{number}</span><small>{round.source === "voice" ? messages.common.byVoice : messages.common.manual}</small></div>
               {canEdit && <div className="row-actions">
-                <button className="icon-button" aria-label={`Editar rodada ${number}`} onClick={() => setEditing(round)}><Pencil size={17} /></button>
-                <button className="icon-button danger-subtle" aria-label={`Excluir rodada ${number}`} onClick={() => {
-                  if (window.confirm(`Excluir a rodada ${number}? O ranking será recalculado.`)) deleteRound(round.id);
+                <button className="icon-button" aria-label={messages.game.editRoundLabel(number)} onClick={() => setEditing(round)}><Pencil size={17} /></button>
+                <button className="icon-button danger-subtle" aria-label={messages.game.deleteRoundLabel(number)} onClick={() => {
+                  if (window.confirm(messages.game.deleteRoundConfirm(number))) deleteRound(round.id);
                 }}><Trash2 size={17} /></button>
               </div>}
             </div>
@@ -101,7 +115,7 @@ function HistoryPanel({ game, canEdit, updateRound, deleteRound }: {
       {editing && <ScoreForm
         game={game}
         initial={editing.scores}
-        title="Editar rodada"
+        title={messages.game.editRound}
         onClose={() => setEditing(null)}
         onSave={(scores) => { updateRound(editing.id, scores); setEditing(null); }}
       />}
@@ -116,6 +130,7 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
   addPlayer: (name: string) => void;
   removePlayer: (playerId: PlayerId) => void;
 }) {
+  const { locale, messages } = useI18n();
   const [newName, setNewName] = useState("");
   const [draftNames, setDraftNames] = useState<Record<PlayerId, string>>(() => Object.fromEntries(game.players.map((player) => [player.id, player.name])));
   useEffect(() => {
@@ -123,29 +138,28 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
   }, [game.players]);
   return (
     <div className="players-panel">
-      <p className="panel-note">Renomear preserva o histórico. Um jogador novo começa com zero nas rodadas anteriores.</p>
+      <p className="panel-note">{messages.game.playersNote}</p>
       <div className="manage-player-list">
         {game.players.map((player, index) => (
           <div className="manage-player" key={player.id}>
             <span className="player-number">{index + 1}</span>
             <input
-              aria-label={`Nome de ${player.name}`}
+              aria-label={messages.game.playerNameLabel(player.name)}
               value={draftNames[player.id] ?? player.name}
               disabled={!canEdit}
               onChange={(event) => setDraftNames((current) => ({ ...current, [player.id]: event.target.value }))}
               onBlur={(event) => {
                 const name = event.target.value.trim();
-                const duplicate = game.players.some((candidate) => candidate.id !== player.id && candidate.name.localeCompare(name, "pt-BR", { sensitivity: "base" }) === 0);
-                if (!name || duplicate) {
-                  setDraftNames((current) => ({ ...current, [player.id]: player.name }));
-                } else {
+                const duplicate = game.players.some((candidate) => candidate.id !== player.id && candidate.name.localeCompare(name, locale, { sensitivity: "base" }) === 0);
+                if (!name || duplicate) setDraftNames((current) => ({ ...current, [player.id]: player.name }));
+                else {
                   renamePlayer(player.id, name);
                   setDraftNames((current) => ({ ...current, [player.id]: name }));
                 }
               }}
             />
-            {canEdit && <button className="icon-button danger-subtle" aria-label={`Remover ${player.name}`} disabled={game.players.length <= 2} onClick={() => {
-              if (window.confirm(`Remover ${player.name}? As pontuações desse jogador serão excluídas desta partida.`)) removePlayer(player.id);
+            {canEdit && <button className="icon-button danger-subtle" aria-label={messages.game.removePlayerLabel(player.name)} disabled={game.players.length <= 2} onClick={() => {
+              if (window.confirm(messages.game.removePlayerConfirm(player.name))) removePlayer(player.id);
             }}><Trash2 size={17} /></button>}
           </div>
         ))}
@@ -154,12 +168,12 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
         event.preventDefault();
         const name = newName.trim();
         if (!name) return;
-        if (game.players.some((player) => player.name.localeCompare(name, "pt-BR", { sensitivity: "base" }) === 0)) return;
+        if (game.players.some((player) => player.name.localeCompare(name, locale, { sensitivity: "base" }) === 0)) return;
         addPlayer(name);
         setNewName("");
       }}>
-        <input aria-label="Nome do novo jogador" placeholder="Novo jogador" value={newName} onChange={(event) => setNewName(event.target.value)} />
-        <button className="secondary-button" type="submit"><Plus size={18} /> Adicionar</button>
+        <input aria-label={messages.game.newPlayer} placeholder={messages.game.newPlayer} value={newName} onChange={(event) => setNewName(event.target.value)} />
+        <button className="secondary-button" type="submit"><Plus size={18} /> {messages.game.addPlayer}</button>
       </form>}
     </div>
   );
@@ -168,9 +182,8 @@ function PlayersPanel({ game, canEdit, renamePlayer, addPlayer, removePlayer }: 
 export default function GamePage() {
   const { gameId } = useParams();
   const navigate = useNavigate();
-  const {
-    state, addRound, updateRound, deleteRound, renamePlayer, addPlayer, removePlayer, finishGame,
-  } = useAppStore();
+  const { locale, messages } = useI18n();
+  const { state, addRound, updateRound, deleteRound, renamePlayer, addPlayer, removePlayer, finishGame } = useAppStore();
   const game = state.games.find((item) => item.id === gameId);
   const [panel, setPanel] = useState<Panel>("ranking");
   const [manualOpen, setManualOpen] = useState(false);
@@ -188,123 +201,118 @@ export default function GamePage() {
     if (game) finishGame(game.id);
   }, [finishGame, game]);
 
-  const voice = useVoiceConversation({ game: game ?? { id: "", startedAt: "", status: "active", players: [], rounds: [] }, onAddRound, onDeleteRound, onFinish });
+  const emptyGame: Game = { id: "", startedAt: "", status: "active", players: [], rounds: [] };
+  const voice = useVoiceConversation({ game: game ?? emptyGame, locale, onAddRound, onDeleteRound, onFinish });
   const wake = useWakeLock(Boolean(game && game.status === "active" && wakeEnabled));
-  const ranking = useMemo(() => game ? rankingFor(game) : [], [game]);
+  const ranking = useMemo(() => game ? rankingFor(game, game.rounds, locale) : [], [game, locale]);
 
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
   const voiceActive = voice.status.phase !== "idle" && voice.status.phase !== "error";
 
   const share = async () => {
-    const text = shareText(game);
+    const text = shareText(game, locale);
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Resultado da partida", text });
+        await navigator.share({ title: messages.share.title, text });
         return;
       }
       await navigator.clipboard.writeText(text);
-      setToast("Resultado copiado");
+      setToast(messages.game.resultCopied);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       try {
         await navigator.clipboard.writeText(text);
-        setToast("Resultado copiado");
+        setToast(messages.game.resultCopied);
       } catch {
-        setToast("Não foi possível compartilhar");
+        setToast(messages.game.shareFailed);
       }
     }
     window.setTimeout(() => setToast(""), 2500);
   };
 
+  const panelTitle = panel === "ranking" ? messages.game.ranking : panel === "history" ? messages.game.rounds : messages.game.players;
+  const currentPhase = phaseLabel(voice.status.phase, messages);
+
   return (
     <main className={`game-page ${game.status === "finished" ? "finished" : ""}`}>
       <header className="game-topbar">
-        <button className="icon-button on-dark" aria-label="Voltar ao histórico" onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
-        <div className="game-title"><small>{game.status === "active" ? "Jogo em andamento" : "Resultado final"}</small><strong>{formatGameDate(game.startedAt)}</strong></div>
-        {game.status === "active" ? (
-          <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? "Permitir que a tela apague" : "Manter a tela ligada"} onClick={() => setWakeEnabled((value) => !value)}>
-            {wakeEnabled ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
-        ) : <span className="topbar-spacer" />}
+        <button className="icon-button on-dark" aria-label={messages.home.history} onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
+        <div className="game-title"><small>{game.status === "active" ? messages.game.active : messages.game.finalResult}</small><strong>{formatGameDate(game.startedAt, locale)}</strong></div>
+        <div className="game-topbar-actions">
+          <LanguageSelect onDark />
+          {game.status === "active" && (
+            <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? messages.game.keepScreenAwakeOff : messages.game.keepScreenAwakeOn} onClick={() => setWakeEnabled((value) => !value)}>
+              {wakeEnabled ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
+          )}
+        </div>
       </header>
 
       <section className="scoreboard-shell">
         <div className="scoreboard-heading">
-          <div><p className="eyebrow">{game.rounds.length} {game.rounds.length === 1 ? "rodada" : "rodadas"}</p><h1>{panel === "ranking" ? "Ranking" : panel === "history" ? "Rodadas" : "Jogadores"}</h1></div>
+          <div><p className="eyebrow">{messages.game.roundCount(game.rounds.length)}</p><h1>{panelTitle}</h1></div>
           {game.status === "finished" && <Trophy size={34} className="result-trophy" />}
         </div>
 
-        {panel === "ranking" && <div className="ranking-list" aria-label="Ranking atual">
+        {panel === "ranking" && <div className="ranking-list" aria-label={messages.game.currentRanking}>
           {ranking.map(({ player, total, position }, index) => (
             <article className={`ranking-row place-${position}`} key={player.id}>
-              <span className="rank-position">{position}<sup>º</sup></span>
-              <span className="rank-avatar" aria-hidden="true">{player.name.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
-              <span className="rank-name"><strong>{player.name}</strong>{index === 0 && game.rounds.length > 0 && <small>Na liderança</small>}</span>
+              <span className="rank-position">{ordinal(position, locale)}</span>
+              <span className="rank-avatar" aria-hidden="true">{player.name.slice(0, 1).toLocaleUpperCase(locale)}</span>
+              <span className="rank-name"><strong>{player.name}</strong>{index === 0 && game.rounds.length > 0 && <small>{messages.game.leading}</small>}</span>
               <strong className="rank-score">{total}</strong>
             </article>
           ))}
         </div>}
 
-        {panel === "history" && <HistoryPanel
-          game={game}
-          canEdit={canEdit}
-          updateRound={(roundId, scores) => updateRound(game.id, roundId, scores)}
-          deleteRound={(roundId) => deleteRound(game.id, roundId)}
-        />}
+        {panel === "history" && <HistoryPanel game={game} canEdit={canEdit} updateRound={(roundId, scores) => updateRound(game.id, roundId, scores)} deleteRound={(roundId) => deleteRound(game.id, roundId)} />}
+        {panel === "players" && <PlayersPanel game={game} canEdit={canEdit} renamePlayer={(playerId, name) => renamePlayer(game.id, playerId, name)} addPlayer={(name) => addPlayer(game.id, name)} removePlayer={(playerId) => removePlayer(game.id, playerId)} />}
 
-        {panel === "players" && <PlayersPanel
-          game={game}
-          canEdit={canEdit}
-          renamePlayer={(playerId, name) => renamePlayer(game.id, playerId, name)}
-          addPlayer={(name) => addPlayer(game.id, name)}
-          removePlayer={(playerId) => removePlayer(game.id, playerId)}
-        />}
-
-        {game.status === "active" && panel === "ranking" && <section className={`voice-card phase-${voice.status.phase}`} aria-live="polite">
-          <div className="voice-status-line"><span className="voice-pulse" /><strong>{phaseCopy[voice.status.phase]}</strong></div>
-          <p>{voice.status.message}</p>
-          {voice.status.transcript && <blockquote>“{voice.status.transcript}”</blockquote>}
-          {voice.status.draftScores && <div className="draft-score-chips">
-            {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
-          </div>}
-        </section>}
+        {game.status === "active" && panel === "ranking" && <>
+          <section className={`voice-card phase-${voice.status.phase}`} aria-live="polite">
+            <div className="voice-status-line"><span className="voice-pulse" /><strong>{currentPhase}</strong></div>
+            <p>{voice.status.message}</p>
+            {voice.status.transcript && <blockquote>“{voice.status.transcript}”</blockquote>}
+            {voice.status.draftScores && <div className="draft-score-chips">
+              {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
+            </div>}
+          </section>
+          <aside className="command-help" aria-label={messages.game.commandHelpTitle}>
+            <strong>{messages.game.commandHelpTitle}</strong>
+            <span>{messages.game.commandHelp}</span>
+          </aside>
+        </>}
 
         {game.status === "finished" && panel === "ranking" && <div className="result-actions">
-          <button className="primary-button" onClick={() => void share()}><Share2 size={19} /> Compartilhar resultado</button>
-          <button className="secondary-button" onClick={() => setEditingFinished((value) => !value)}><Pencil size={18} /> {editingFinished ? "Encerrar edição" : "Editar resultado"}</button>
+          <button className="primary-button" onClick={() => void share()}><Share2 size={19} /> {messages.game.shareResult}</button>
+          <button className="secondary-button" onClick={() => setEditingFinished((value) => !value)}><Pencil size={18} /> {editingFinished ? messages.game.stopEditing : messages.game.editResult}</button>
         </div>}
       </section>
 
       {game.status === "active" && <div className="voice-dock">
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          aria-label={voiceActive ? "Interromper ou encerrar conversa" : "Falar com o placar"}
+          aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onClick={() => { void wake.request(); voice.activate(); }}
         >
           <span className="mic-rings" aria-hidden="true" />
           {voiceActive ? <Square size={25} fill="currentColor" /> : <Mic size={31} />}
         </button>
-        <div><strong>{voiceActive ? phaseCopy[voice.status.phase] : "Falar com o placar"}</strong><small>{voice.supported ? "Diga os nomes e os pontos" : "Voz indisponível neste navegador"}</small></div>
-        <button className="manual-link" onClick={() => setManualOpen(true)}>Digitar</button>
+        <div><strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong><small>{voice.supported ? messages.game.sayNamesAndScores : messages.game.voiceUnavailable}</small></div>
+        <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
       </div>}
 
-      <nav className="game-nav" aria-label="Navegação do jogo">
-        <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><Trophy size={20} /><span>Ranking</span></button>
-        <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><ClipboardList size={20} /><span>Rodadas</span></button>
-        <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><Users size={20} /><span>Jogadores</span></button>
+      <nav className="game-nav" aria-label={messages.game.navigation}>
+        <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><Trophy size={20} /><span>{messages.game.ranking}</span></button>
+        <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><ClipboardList size={20} /><span>{messages.game.rounds}</span></button>
+        <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><Users size={20} /><span>{messages.game.players}</span></button>
         {game.status === "active" && <button className="finish-nav" onClick={() => {
-          if (window.confirm("Finalizar o jogo e congelar o resultado?")) finishGame(game.id);
-        }}><ChevronRight size={20} /><span>Finalizar</span></button>}
+          if (window.confirm(messages.game.finishConfirm)) finishGame(game.id);
+        }}><ChevronRight size={20} /><span>{messages.game.finish}</span></button>}
       </nav>
 
-      {manualOpen && <ScoreForm
-        game={game}
-        title="Adicionar rodada"
-        onClose={() => setManualOpen(false)}
-        onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }}
-      />}
-
+      {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );

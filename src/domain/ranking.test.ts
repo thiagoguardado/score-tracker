@@ -17,14 +17,16 @@ const game: Game = {
 };
 
 describe("ranking", () => {
-  it("compartilha posição em empates", () => {
+  it("shares positions for tied scores", () => {
     expect(rankingFor(game).map(({ player, position }) => [player.name, position])).toEqual([
       ["Ana", 1], ["Bia", 1], ["Caio", 3],
     ]);
   });
 
-  it("gera textos falado e compartilhável", () => {
-    expect(spokenRanking(game)).toContain("1º, Ana, 10 pontos");
-    expect(shareText(game)).toContain("🥇 Bia — 10 pontos");
+  it("creates localized spoken and shareable text", () => {
+    expect(spokenRanking(game, "en")).toContain("1, Ana, 10 points");
+    expect(shareText(game, "en")).toContain("🥇 Bia — 10 points");
+    expect(spokenRanking(game, "pt-BR")).toContain("1, Ana, 10 pontos");
+    expect(shareText(game, "pt-BR")).toContain("Resultado da partida");
   });
 });

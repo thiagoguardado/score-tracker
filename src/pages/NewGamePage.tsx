@@ -1,18 +1,16 @@
 import { ArrowLeft, Mic, Plus, Trash2, Volume2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LanguageSelect } from "../components/LanguageSelect";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
+import { useI18n } from "../i18n";
 import { listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
 
 const newField = (name = ""): NameField => ({ id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`, name });
-
-function namesSpeech(names: string[]): string {
-  return `${names.length} jogadores. ${names.join(". ")}. Diga confirmar, repetir, adicionar, remover ou corrigir um nome.`;
-}
 
 function validNames(fields: NameField[]): string[] | null {
   const names = fields.map((field) => field.name.trim()).filter(Boolean);
@@ -23,12 +21,22 @@ function validNames(fields: NameField[]): string[] | null {
 
 export default function NewGamePage() {
   const navigate = useNavigate();
+  const { locale, messages } = useI18n();
   const { createGame } = useAppStore();
   const [fields, setFields] = useState<NameField[]>([newField(), newField()]);
-  const [voiceMessage, setVoiceMessage] = useState("Diga os nomes em uma única frase");
+  const [voiceMessage, setVoiceMessage] = useState(messages.setup.namesHint);
   const [voiceActive, setVoiceActive] = useState(false);
   const [error, setError] = useState("");
   const running = useRef(false);
+
+  useEffect(() => {
+    if (running.current) {
+      running.current = false;
+      stopAudio();
+      setVoiceActive(false);
+    }
+    setVoiceMessage(messages.setup.namesHint);
+  }, [locale, messages]);
 
   const commitGame = (names: string[]) => {
     const id = createGame(names);
@@ -38,7 +46,7 @@ export default function NewGamePage() {
   const startManually = () => {
     const names = validNames(fields);
     if (!names) {
-      setError("Informe pelo menos dois nomes diferentes.");
+      setError(messages.setup.needTwoUnique);
       return;
     }
     commitGame(names);
@@ -49,11 +57,11 @@ export default function NewGamePage() {
       running.current = false;
       stopAudio();
       setVoiceActive(false);
-      setVoiceMessage("Conversa encerrada");
+      setVoiceMessage(messages.setup.conversationEnded);
       return;
     }
     if (!supportsRecognition()) {
-      setError("A voz não está disponível neste navegador. Cadastre os jogadores abaixo.");
+      setError(messages.setup.voiceUnavailableLong);
       return;
     }
 
@@ -64,32 +72,32 @@ export default function NewGamePage() {
 
     try {
       while (running.current) {
-        setVoiceMessage("Ouvindo…");
-        const transcript = await listenOnce();
+        setVoiceMessage(messages.setup.listening);
+        const transcript = await listenOnce(locale);
         if (!running.current) break;
         setVoiceMessage(`“${transcript}”`);
-        const command = parseSetupVoiceCommand(transcript, currentNames.length > 0);
+        const command = parseSetupVoiceCommand(transcript, currentNames.length > 0, locale);
 
         if (command.type === "cancel") {
-          await speak("Cadastro cancelado.");
+          await speak(messages.setup.setupCancelled, locale);
           break;
         }
         if (command.type === "confirm") {
           if (currentNames.length < 2) {
-            await speak("Preciso de pelo menos dois jogadores. Diga os nomes novamente.");
+            await speak(messages.setup.needTwoPlayersSpeech, locale);
             currentNames = [];
             continue;
           }
           if (new Set(currentNames.map(normalizeSpeech)).size !== currentNames.length) {
-            await speak("Existem nomes repetidos. Corrija antes de confirmar.");
+            await speak(messages.setup.duplicateNamesSpeech, locale);
             continue;
           }
-          await speak("Jogadores confirmados. Vamos começar.");
+          await speak(messages.setup.playersConfirmed, locale);
           commitGame(currentNames);
           return;
         }
         if (command.type === "repeat") {
-          await speak(currentNames.length ? namesSpeech(currentNames) : "Ainda não entendi os jogadores. Diga todos os nomes.");
+          await speak(currentNames.length ? messages.setup.playersSpeech(currentNames) : messages.setup.noPlayersYet, locale);
           continue;
         }
         if (command.type === "names") currentNames = command.names;
@@ -103,46 +111,46 @@ export default function NewGamePage() {
           currentNames = currentNames.map((name) => normalizeSpeech(name) === target ? command.to : name);
         }
         if (command.type === "unknown") {
-          await speak(currentNames.length ? "Não entendi. Diga confirmar, repetir, adicionar, remover ou corrigir." : "Diga todos os nomes dos jogadores.");
+          await speak(currentNames.length ? messages.setup.unknownWithNames : messages.setup.sayAllNames, locale);
           continue;
         }
 
         setFields(currentNames.map(newField));
-        await speak(namesSpeech(currentNames));
+        await speak(messages.setup.playersSpeech(currentNames), locale);
       }
     } catch (voiceError) {
       const code = voiceError instanceof Error ? voiceError.message : "";
-      setError(code.includes("not-allowed") ? "Permita o microfone e verifique se a Siri está ativada." : "Não consegui ouvir. Você pode tentar novamente ou digitar os nomes.");
+      setError(code.includes("not-allowed") ? messages.setup.microphonePermission : messages.setup.couldNotHear);
     } finally {
       running.current = false;
       stopAudio();
       setVoiceActive(false);
-      setVoiceMessage("Diga os nomes em uma única frase");
+      setVoiceMessage(messages.setup.namesHint);
     }
   };
 
   return (
     <main className="page setup-page">
       <header className="topbar">
-        <button className="icon-button" aria-label="Voltar" onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
-        <span>Novo jogo</span>
-        <span className="topbar-spacer" />
+        <button className="icon-button" aria-label={messages.common.close} onClick={() => navigate("/")}><ArrowLeft size={22} /></button>
+        <span>{messages.setup.newGame}</span>
+        <LanguageSelect />
       </header>
 
       <section className="setup-hero">
-        <p className="eyebrow">Quem vai jogar?</p>
-        <h1>Cadastre por voz</h1>
-        <p>Fale os nomes, confira ouvindo e diga “confirmar”.</p>
+        <p className="eyebrow">{messages.setup.whoIsPlaying}</p>
+        <h1>{messages.setup.registerByVoice}</h1>
+        <p>{messages.setup.voiceDescription}</p>
         <button className={`setup-mic ${voiceActive ? "active" : ""}`} onClick={() => void runVoiceSetup()}>
           <span className="mic-orbit"><Mic size={30} /></span>
-          <span><strong>{voiceActive ? "Encerrar conversa" : "Dizer jogadores"}</strong><small>{voiceMessage}</small></span>
+          <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
         </button>
-        {!supportsRecognition() && <div className="voice-unavailable"><Volume2 size={18} /> Voz indisponível; use os campos abaixo.</div>}
+        {!supportsRecognition() && <div className="voice-unavailable"><Volume2 size={18} /> {messages.setup.voiceUnavailable}</div>}
       </section>
 
       <section className="manual-setup" aria-labelledby="players-title">
         <div className="section-heading compact">
-          <div><p className="eyebrow">Conferência manual</p><h2 id="players-title">Jogadores</h2></div>
+          <div><p className="eyebrow">{messages.setup.manualReview}</p><h2 id="players-title">{messages.setup.players}</h2></div>
           <span className="count-badge">{fields.filter((field) => field.name.trim()).length}</span>
         </div>
         <div className="player-fields">
@@ -150,23 +158,23 @@ export default function NewGamePage() {
             <div className="player-field" key={field.id}>
               <span className="player-number">{index + 1}</span>
               <input
-                aria-label={`Nome do jogador ${index + 1}`}
-                placeholder="Nome"
+                aria-label={messages.setup.playerNameLabel(index + 1)}
+                placeholder={messages.setup.namePlaceholder}
                 value={field.name}
                 onChange={(event) => {
                   setFields((current) => current.map((item) => item.id === field.id ? { ...item, name: event.target.value } : item));
                   setError("");
                 }}
               />
-              <button className="icon-button danger-subtle" aria-label={`Remover jogador ${index + 1}`} disabled={fields.length <= 2} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>
+              <button className="icon-button danger-subtle" aria-label={messages.setup.removePlayerLabel(index + 1)} disabled={fields.length <= 2} onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}>
                 <Trash2 size={18} />
               </button>
             </div>
           ))}
         </div>
-        <button className="text-button" onClick={() => setFields((current) => [...current, newField()])}><Plus size={18} /> Adicionar jogador</button>
+        <button className="text-button" onClick={() => setFields((current) => [...current, newField()])}><Plus size={18} /> {messages.setup.addPlayer}</button>
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button" onClick={startManually}>Começar jogo</button>
+        <button className="primary-button" onClick={startManually}>{messages.setup.startGame}</button>
       </section>
     </main>
   );

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Game } from "../types";
 import { listenOnce, speak } from "../speech";
+import type { Game } from "../types";
 import { useVoiceConversation } from "./useVoiceConversation";
 
 vi.mock("../speech", () => ({
@@ -15,42 +15,56 @@ const game: Game = {
   id: "game",
   startedAt: "2026-08-09T12:00:00.000Z",
   status: "active",
-  players: [{ id: "thiago", name: "Thiago" }, { id: "mario", name: "Mário" }],
+  players: [{ id: "alex", name: "Alex" }, { id: "sam", name: "Sam" }],
   rounds: [],
 };
 
 describe("useVoiceConversation", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("faz a rodada, corrige e confirma sem novo toque", async () => {
+  it("drafts, repeats, corrects, and confirms without another tap", async () => {
     vi.mocked(listenOnce)
-      .mockResolvedValueOnce("Thiago zero e Mário sete")
-      .mockResolvedValueOnce("repetir")
-      .mockResolvedValueOnce("corrigir Mário para nove")
-      .mockResolvedValueOnce("confirmar");
+      .mockResolvedValueOnce("Alex zero and Sam seven")
+      .mockResolvedValueOnce("repeat")
+      .mockResolvedValueOnce("correct Sam to nine")
+      .mockResolvedValueOnce("confirm");
     const onAddRound = vi.fn();
     const { result } = renderHook(() => useVoiceConversation({
       game,
+      locale: "en",
       onAddRound,
       onDeleteRound: vi.fn(),
       onFinish: vi.fn(),
     }));
 
     act(() => result.current.activate());
-    await waitFor(() => expect(onAddRound).toHaveBeenCalledWith({ thiago: 0, mario: 9 }));
+    await waitFor(() => expect(onAddRound).toHaveBeenCalledWith({ alex: 0, sam: 9 }));
     expect(vi.mocked(listenOnce)).toHaveBeenCalledTimes(4);
     expect(vi.mocked(speak).mock.calls.at(-1)?.[0]).toContain("Ranking");
+    expect(vi.mocked(speak).mock.calls.at(-1)?.[1]).toBe("en");
   });
 
-  it("não salva antes de confirmar", async () => {
+  it("does not save before confirmation", async () => {
     vi.mocked(listenOnce)
-      .mockResolvedValueOnce("Thiago três e Mário cinco")
-      .mockResolvedValueOnce("cancelar");
+      .mockResolvedValueOnce("Alex three and Sam five")
+      .mockResolvedValueOnce("cancel");
     const onAddRound = vi.fn();
-    const { result } = renderHook(() => useVoiceConversation({ game, onAddRound, onDeleteRound: vi.fn(), onFinish: vi.fn() }));
+    const { result } = renderHook(() => useVoiceConversation({ game, locale: "en", onAddRound, onDeleteRound: vi.fn(), onFinish: vi.fn() }));
 
     act(() => result.current.activate());
-    await waitFor(() => expect(vi.mocked(speak)).toHaveBeenCalledWith(expect.stringContaining("Nenhum valor foi salvo")));
+    await waitFor(() => expect(vi.mocked(speak)).toHaveBeenCalledWith(expect.stringContaining("No scores were saved"), "en"));
     expect(onAddRound).not.toHaveBeenCalled();
+  });
+
+  it("uses Portuguese commands when Portuguese is selected", async () => {
+    vi.mocked(listenOnce)
+      .mockResolvedValueOnce("Alex três e Sam cinco")
+      .mockResolvedValueOnce("confirmar");
+    const onAddRound = vi.fn();
+    const { result } = renderHook(() => useVoiceConversation({ game, locale: "pt-BR", onAddRound, onDeleteRound: vi.fn(), onFinish: vi.fn() }));
+
+    act(() => result.current.activate());
+    await waitFor(() => expect(onAddRound).toHaveBeenCalledWith({ alex: 3, sam: 5 }));
+    expect(vi.mocked(speak).mock.calls.at(-1)?.[1]).toBe("pt-BR");
   });
 });

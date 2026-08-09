@@ -1,24 +1,27 @@
 import { ArrowRight, Plus, Trash2, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { LanguageSelect } from "../components/LanguageSelect";
 import { rankingFor } from "../domain/ranking";
+import { useI18n, type Locale, type Messages } from "../i18n";
 import { useAppStore } from "../store";
 
-function formatStartedAt(value: string): string {
+function formatStartedAt(value: string, locale: Locale, messages: Messages): string {
   const date = new Date(value);
   const today = new Date();
   const sameDay = date.toDateString() === today.toDateString();
-  const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
-  if (sameDay) return `Hoje, ${time}`;
-  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(date);
+  if (sameDay) return messages.home.todayAt(time);
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { locale, messages } = useI18n();
   const { state, deleteGame, storageHealthy } = useAppStore();
   const games = [...state.games].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
   const removeGame = (gameId: string) => {
-    if (window.confirm("Excluir este jogo e todas as suas rodadas? Essa ação não pode ser desfeita.")) deleteGame(gameId);
+    if (window.confirm(messages.home.deleteGameConfirm)) deleteGame(gameId);
   };
 
   return (
@@ -26,24 +29,25 @@ export default function HomePage() {
       <header className="home-header">
         <div className="brand-mark" aria-hidden="true"><Trophy size={22} /></div>
         <div>
-          <p className="eyebrow">Seu placar de mesa</p>
-          <h1>Placar</h1>
+          <p className="eyebrow">{messages.home.tagline}</p>
+          <h1>{messages.meta.title}</h1>
         </div>
+        <LanguageSelect />
       </header>
 
-      {!storageHealthy && <div className="alert" role="alert">Não foi possível salvar no aparelho. Verifique o espaço e as permissões do navegador.</div>}
+      {!storageHealthy && <div className="alert" role="alert">{messages.home.storageError}</div>}
 
       <button className="new-game-card" onClick={() => navigate("/games/new")}>
         <span className="new-game-icon"><Plus size={28} /></span>
-        <span><strong>Novo jogo</strong><small>Cadastre os jogadores por voz</small></span>
+        <span><strong>{messages.home.newGame}</strong><small>{messages.home.newGameSubtitle}</small></span>
         <ArrowRight size={24} aria-hidden="true" />
       </button>
 
       <section className="history-section" aria-labelledby="history-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Salvo neste aparelho</p>
-            <h2 id="history-title">Histórico</h2>
+            <p className="eyebrow">{messages.home.savedOnDevice}</p>
+            <h2 id="history-title">{messages.home.history}</h2>
           </div>
           {games.length > 0 && <span className="count-badge">{games.length}</span>}
         </div>
@@ -51,28 +55,29 @@ export default function HomePage() {
         {games.length === 0 ? (
           <div className="empty-state">
             <div className="empty-trophy" aria-hidden="true"><Trophy size={30} /></div>
-            <h3>Sua primeira partida começa aqui</h3>
-            <p>Os jogos e todas as rodadas ficam salvos automaticamente neste aparelho.</p>
+            <h3>{messages.home.firstGame}</h3>
+            <p>{messages.home.emptyDescription}</p>
           </div>
         ) : (
           <div className="game-list">
             {games.map((game) => {
-              const ranking = rankingFor(game);
+              const ranking = rankingFor(game, game.rounds, locale);
               const leader = game.rounds.length > 0 ? ranking[0] : undefined;
+              const date = formatStartedAt(game.startedAt, locale, messages);
               return (
                 <article className="game-card" key={game.id}>
                   <button className="game-card-main" onClick={() => navigate(`/games/${encodeURIComponent(game.id)}`)}>
                     <span className={`status-dot ${game.status}`} aria-hidden="true" />
                     <span className="game-card-copy">
-                      <strong>{formatStartedAt(game.startedAt)}</strong>
-                      <small>{game.players.length} jogadores · {game.rounds.length} {game.rounds.length === 1 ? "rodada" : "rodadas"}</small>
+                      <strong>{date}</strong>
+                      <small>{messages.home.gameSummary(game.players.length, game.rounds.length)}</small>
                       <span className="game-summary">
-                        {game.status === "active" ? "Em andamento" : leader ? `${leader.player.name} venceu com ${leader.total}` : "Finalizado sem rodadas"}
+                        {game.status === "active" ? messages.home.inProgress : leader ? messages.home.winner(leader.player.name, leader.total) : messages.home.finishedNoRounds}
                       </span>
                     </span>
                     <ArrowRight size={20} aria-hidden="true" />
                   </button>
-                  <button className="icon-button danger-subtle" aria-label={`Excluir jogo de ${formatStartedAt(game.startedAt)}`} onClick={() => removeGame(game.id)}>
+                  <button className="icon-button danger-subtle" aria-label={messages.home.deleteGameLabel(date)} onClick={() => removeGame(game.id)}>
                     <Trash2 size={18} />
                   </button>
                 </article>

@@ -285,6 +285,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .score-fields { display: grid; gap: 9px; margin: 22px 0; }
 .score-field { display: grid; grid-template-columns: 1fr 100px; align-items: center; gap: 14px; padding: 8px 8px 8px 16px; border: 0; border-radius: var(--radius-medium); background: var(--soft); font-weight: 800; }
 .score-field input { min-height: 45px; text-align: right; font-size: 1.15rem; font-weight: 900; }
+.sheet > .primary-button { position: sticky; z-index: 2; bottom: 0; margin-top: 6px; }
 .toast { position: fixed; z-index: 70; bottom: calc(104px + env(safe-area-inset-bottom)); left: 50%; padding: 13px 20px; border: 0; border-radius: var(--radius-pill); color: #ffffff; background: #0a0a0a; box-shadow: var(--floating-shadow); font-size: 0.82rem; font-weight: 900; transform: translateX(-50%); }
 
 @media (min-width: 760px) {
@@ -338,6 +339,8 @@ html[data-theme="dark"] .language-select.on-dark,
 html[data-theme="dark"] .theme-select.on-dark { color: #555555; background: #eeeeee; }
 html[data-theme="dark"] .language-select.on-dark select,
 html[data-theme="dark"] .theme-select.on-dark select { color: #000000; }
+html[data-theme="dark"] .language-select option,
+html[data-theme="dark"] .theme-select option { color: #000000; background: #ffffff; }
 html[data-theme="dark"] .wake-button { color: #555555; background: #eeeeee; }
 html[data-theme="dark"] .wake-button.active { color: #ffffff; background: #000000; }
 html[data-theme="dark"] .setup-mic small,

@@ -65,6 +65,8 @@ test("supports system, light, and persistent dark themes", async ({ page }) => {
   await page.getByLabel("Theme").selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(page.getByLabel("Theme").locator("option").first()).toHaveCSS("color", "rgb(0, 0, 0)");
+  await expect(page.getByLabel("Theme").locator("option").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
 
   await page.reload();
   await expect(page.getByLabel("Theme")).toHaveValue("dark");

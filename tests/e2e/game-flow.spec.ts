@@ -25,7 +25,7 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByText("10", { exact: true })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Finish" }).click();
+  await page.getByRole("button", { name: "Finish" }).press("Enter");
   await expect(page.getByText("Final result")).toBeVisible();
   await expect(page.getByRole("button", { name: /share result/i })).toBeVisible();
 });
@@ -40,7 +40,7 @@ test("edits and deletes rounds from history", async ({ page }) => {
   await page.getByLabel("Bia").fill("6");
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");
 
-  await page.getByRole("button", { name: "Rounds" }).click();
+  await page.getByRole("button", { name: "Rounds" }).press("Enter");
   await page.getByRole("button", { name: "Edit round 1" }).click();
   await page.getByLabel("Ana").fill("9");
   await page.getByRole("button", { name: "Confirm round" }).press("Enter");

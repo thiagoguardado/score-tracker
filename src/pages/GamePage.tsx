@@ -254,7 +254,7 @@ export default function GamePage() {
         {panel === "ranking" && <div className="ranking-list" aria-label={messages.game.currentRanking}>
           {ranking.map(({ player, total, position }, index) => (
             <article className={`ranking-row place-${position}`} key={player.id}>
-              <span className="rank-position">{ordinal(position, locale)}</span>
+              <span className="rank-position">{index === 0 && game.rounds.length > 0 && <span className="leader-emoji" aria-hidden="true">🏆</span>}{ordinal(position, locale)}</span>
               <span className="rank-name"><strong>{player.name}</strong>{index === 0 && game.rounds.length > 0 && <small>{messages.game.leading}</small>}</span>
               <strong className="rank-score">{total}</strong>
             </article>
@@ -291,7 +291,7 @@ export default function GamePage() {
           aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onClick={() => { void wake.request(); voice.activate(); }}
         >
-          <span>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
+          <span><span aria-hidden="true">🎙️</span> {voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
         </button>
         <div><strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong><small>{voice.supported ? messages.game.sayNamesAndScores : messages.game.voiceUnavailable}</small></div>
         <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>

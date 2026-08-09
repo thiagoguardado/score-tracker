@@ -14,6 +14,10 @@ const englishMessages = {
   },
   common: {
     language: "Language",
+    theme: "Theme",
+    system: "System",
+    light: "Light",
+    dark: "Dark",
     english: "English",
     portuguese: "Português",
     close: "Close",
@@ -171,7 +175,7 @@ const englishMessages = {
 
 const portugueseMessages: Messages = {
   meta: { title: "Placar", description: "Um placar de jogos operado principalmente por voz." },
-  common: { language: "Idioma", english: "English", portuguese: "Português", close: "Fechar", back: "Voltar", cancel: "Cancelar", add: "Adicionar", edit: "Editar", delete: "Excluir", manual: "Manual", byVoice: "Por voz" },
+  common: { language: "Idioma", theme: "Tema", system: "Sistema", light: "Claro", dark: "Escuro", english: "English", portuguese: "Português", close: "Fechar", back: "Voltar", cancel: "Cancelar", add: "Adicionar", edit: "Editar", delete: "Excluir", manual: "Manual", byVoice: "Por voz" },
   home: {
     tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores por voz", savedOnDevice: "Salvo neste aparelho", history: "Histórico",
     firstGame: "Sua primeira partida começa aqui", emptyDescription: "Os jogos e todas as rodadas ficam salvos automaticamente neste aparelho.",

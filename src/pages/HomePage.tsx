@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
+import { ThemeSelect } from "../components/ThemeSelect";
 import { rankingFor } from "../domain/ranking";
 import { useI18n, type Locale, type Messages } from "../i18n";
 import { useAppStore } from "../store";
@@ -30,7 +31,10 @@ export default function HomePage() {
           <p className="eyebrow">{messages.home.tagline}</p>
           <h1>{messages.meta.title}</h1>
         </div>
-        <LanguageSelect />
+        <div className="preference-selects">
+          <LanguageSelect />
+          <ThemeSelect />
+        </div>
       </header>
 
       {!storageHealthy && <div className="alert" role="alert">{messages.home.storageError}</div>}

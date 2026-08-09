@@ -16,6 +16,7 @@ The app is English-first and currently includes Brazilian Portuguese. On first u
 - installable PWA with offline access to the manual app and saved data;
 - Screen Wake Lock during active games when supported.
 - monochrome, text-only interface with no decorative images or in-app icons.
+- system, light, and dark themes with a persistent manual preference.
 
 No persistent action is applied until it is confirmed. Audio is never recorded or stored.
 
@@ -77,7 +78,7 @@ The app and saved games work offline, but speech recognition may depend on syste
 
 ## Data
 
-Games are stored in `localStorage` under `score-tracker:state:v1`. The selected language is stored separately under `score-tracker:locale`. Data is not synchronized between devices or separate browser storage contexts. Clearing site data removes the game history and language preference.
+Games are stored in `localStorage` under `score-tracker:state:v1`. Language and theme preferences are stored separately under `score-tracker:locale` and `score-tracker:theme`. Data is not synchronized between devices or separate browser storage contexts. Clearing site data removes the game history and preferences.
 
 ## Deployment
 

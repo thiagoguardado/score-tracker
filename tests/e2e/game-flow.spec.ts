@@ -58,3 +58,19 @@ test("persists a manual Portuguese language choice", async ({ page }) => {
   await expect(page.getByLabel("Idioma")).toHaveValue("pt-BR");
   await expect(page.getByRole("button", { name: /novo jogo/i })).toBeVisible();
 });
+
+test("supports system, light, and persistent dark themes", async ({ page }) => {
+  await expect(page.getByLabel("Theme")).toHaveValue("system");
+
+  await page.getByLabel("Theme").selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+
+  await page.reload();
+  await expect(page.getByLabel("Theme")).toHaveValue("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.getByLabel("Theme").selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+});

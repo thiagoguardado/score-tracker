@@ -42,12 +42,12 @@ h1, h2, h3 { letter-spacing: -0.04em; }
   text-transform: uppercase;
 }
 
-.language-select {
+.preference-selects { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.language-select, .theme-select {
   display: inline-flex;
   min-height: 40px;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
   padding: 0 8px 0 11px;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -57,10 +57,10 @@ h1, h2, h3 { letter-spacing: -0.04em; }
   font-weight: 700;
   text-transform: uppercase;
 }
-.language-select select { min-height: 38px; padding: 0 3px; border: 0; color: var(--ink); background: transparent; font-weight: 900; cursor: pointer; }
-.language-select.on-dark { border-color: #555555; color: #bdbdbd; background: #0a0a0a; }
-.language-select.on-dark select { color: #ffffff; }
-.language-select.on-dark option { color: #0a0a0a; background: #ffffff; }
+.language-select select, .theme-select select { min-height: 38px; padding: 0 3px; border: 0; color: var(--ink); background: transparent; font-weight: 900; cursor: pointer; }
+.language-select.on-dark, .theme-select.on-dark { border-color: #555555; color: #bdbdbd; background: #0a0a0a; }
+.language-select.on-dark select, .theme-select.on-dark select { color: #ffffff; }
+.language-select.on-dark option, .theme-select.on-dark option { color: #0a0a0a; background: #ffffff; }
 
 .text-action {
   min-height: 44px;
@@ -145,9 +145,9 @@ h1, h2, h3 { letter-spacing: -0.04em; }
 .game-summary { margin-top: 8px; font-size: 0.82rem; font-weight: 800; }
 .game-card > .text-action { margin-left: 8px; }
 
-.topbar { display: grid; grid-template-columns: 72px 1fr 72px; align-items: center; margin-bottom: 34px; text-align: center; font-weight: 850; }
+.topbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 34px; text-align: center; font-weight: 850; }
 .topbar > .text-action { justify-self: start; }
-.topbar > .language-select { justify-self: end; }
+.topbar > .preference-selects { justify-self: end; }
 
 .setup-hero { text-align: center; }
 .setup-hero h1 { margin-bottom: 12px; font-size: clamp(2.5rem, 11vw, 4rem); font-weight: 900; }
@@ -276,6 +276,13 @@ input { min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(-
   .sheet { align-self: center; border: 2px solid var(--ink); }
 }
 
+@media (max-width: 600px) {
+  .home-header { flex-wrap: wrap; }
+  .home-header .preference-selects { width: 100%; margin-top: 4px; margin-left: 0; }
+  .topbar { grid-template-columns: auto 1fr; }
+  .topbar > .preference-selects { grid-column: 1 / -1; grid-row: 2; margin-top: 4px; }
+}
+
 @media (max-width: 430px) {
   .game-topbar { grid-template-columns: auto 1fr; }
   .game-title { grid-column: 1 / -1; grid-row: 2; margin-top: 8px; }
@@ -287,9 +294,7 @@ input { min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(-
   .main-mic { max-width: 102px; padding: 0 9px; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+html[data-theme="dark"] {
     --ink: #ffffff;
     --muted: #a8a8a8;
     --background: #000000;
@@ -299,13 +304,14 @@ input { min-width: 0; min-height: 48px; padding: 0 14px; border: 1px solid var(-
     --strong-line: #ffffff;
     --inverse: #ffffff;
     --inverse-ink: #000000;
-  }
-  .game-page { color: #000000; background: #ffffff; }
-  .game-topbar { color: #000000; }
-  .game-topbar .text-action.on-dark { color: #000000; }
-  .language-select.on-dark { border-color: #777777; color: #555555; background: #ffffff; }
-  .language-select.on-dark select { color: #000000; }
-  .wake-button { border-color: #777777; color: #555555; background: #ffffff; }
-  .wake-button.active { border-color: #000000; color: #000000; }
-  .setup-mic.active small { color: #555555; }
 }
+html[data-theme="dark"] .game-page { color: #000000; background: #ffffff; }
+html[data-theme="dark"] .game-topbar { color: #000000; }
+html[data-theme="dark"] .game-topbar .text-action.on-dark { color: #000000; }
+html[data-theme="dark"] .language-select.on-dark,
+html[data-theme="dark"] .theme-select.on-dark { border-color: #777777; color: #555555; background: #ffffff; }
+html[data-theme="dark"] .language-select.on-dark select,
+html[data-theme="dark"] .theme-select.on-dark select { color: #000000; }
+html[data-theme="dark"] .wake-button { border-color: #777777; color: #555555; background: #ffffff; }
+html[data-theme="dark"] .wake-button.active { border-color: #000000; color: #000000; }
+html[data-theme="dark"] .setup-mic.active small { color: #555555; }

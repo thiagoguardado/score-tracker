@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
+import { ThemeSelect } from "../components/ThemeSelect";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
 import { useWakeLock } from "../hooks/useWakeLock";
@@ -236,6 +237,7 @@ export default function GamePage() {
         <div className="game-title"><small>{game.status === "active" ? messages.game.active : messages.game.finalResult}</small><strong>{formatGameDate(game.startedAt, locale)}</strong></div>
         <div className="game-topbar-actions">
           <LanguageSelect onDark />
+          <ThemeSelect onDark />
           {game.status === "active" && (
             <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? messages.game.keepScreenAwakeOff : messages.game.keepScreenAwakeOn} onClick={() => setWakeEnabled((value) => !value)}>
               {wakeEnabled ? messages.game.screenOn : messages.game.screenOff}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
+import { ThemeSelect } from "../components/ThemeSelect";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n } from "../i18n";
@@ -133,7 +134,10 @@ export default function NewGamePage() {
       <header className="topbar">
         <button className="text-action" onClick={() => navigate("/")}>{messages.common.back}</button>
         <span>{messages.setup.newGame}</span>
-        <LanguageSelect />
+        <div className="preference-selects">
+          <LanguageSelect />
+          <ThemeSelect />
+        </div>
       </header>
 
       <section className="setup-hero">

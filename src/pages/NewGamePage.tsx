@@ -5,7 +5,7 @@ import { ThemeSelect } from "../components/ThemeSelect";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
-import { getSpeechErrorCode, listenOnce, requiresUserGestureBetweenRecognitions, speak, stopAudio, supportsRecognition } from "../speech";
+import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
@@ -80,13 +80,12 @@ export default function NewGamePage() {
     setVoiceActive(true);
     setError("");
     let currentNames = fields.map((field) => field.name.trim()).filter(Boolean);
-    let recognitionRetryAvailable = true;
     let capturesThisActivation = 0;
     let pausedForGesture = false;
 
     try {
       while (running.current) {
-        if (capturesThisActivation > 0 && requiresUserGestureBetweenRecognitions()) {
+        if (capturesThisActivation > 0) {
           pausedForGesture = true;
           setVoiceMessage(messages.setup.tapToContinue);
           break;
@@ -96,15 +95,7 @@ export default function NewGamePage() {
         try {
           transcript = await listenOnce(locale, 10_000, [], () => setVoiceMessage(messages.setup.listening), setVolume);
           capturesThisActivation += 1;
-          recognitionRetryAvailable = true;
         } catch (voiceError) {
-          const code = getSpeechErrorCode(voiceError);
-          const retryable = code === "no-speech" || code === "timed-out" || code === "speech-timeout";
-          if (running.current && recognitionRetryAvailable && retryable && !requiresUserGestureBetweenRecognitions()) {
-            recognitionRetryAvailable = false;
-            setVoiceMessage(messages.setup.couldNotHear);
-            continue;
-          }
           throw voiceError;
         }
         if (!running.current) break;
@@ -149,7 +140,8 @@ export default function NewGamePage() {
         }
 
         setFields(currentNames.map(newField));
-        await speak(messages.setup.playersSpeech(currentNames), locale);
+        pausedForGesture = true;
+        break;
       }
     } catch (voiceError) {
       const code = getSpeechErrorCode(voiceError);
@@ -178,7 +170,18 @@ export default function NewGamePage() {
         <p className="eyebrow">{messages.setup.whoIsPlaying}</p>
         <h1>{messages.setup.registerByVoice}</h1>
         <p>{messages.setup.voiceDescription}</p>
-        <button className={`setup-mic ${voiceActive ? "active" : ""}`} onClick={() => void runVoiceSetup()}>
+        <button
+          className={`setup-mic ${voiceActive ? "active" : ""}`}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            void runVoiceSetup();
+          }}
+          onPointerUp={(event) => { event.preventDefault(); finishListening(); }}
+          onPointerCancel={() => { stopAudio(); }}
+          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) void runVoiceSetup(); }}
+          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") finishListening(); }}
+        >
           <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${volume})` }} /></span>
         </button>

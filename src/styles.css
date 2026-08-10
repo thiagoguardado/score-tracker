@@ -178,7 +178,7 @@ h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", Inter, sa
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
-.setup-mic, .main-mic { position: relative; overflow: hidden; }
+.setup-mic, .main-mic { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mic-volume { position: absolute; right: 14px; bottom: 8px; left: 14px; height: 3px; overflow: hidden; border-radius: var(--radius-pill); background: rgb(255 255 255 / 20%); }
 .mic-volume > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: currentColor; transform: scaleX(0); transform-origin: left center; transition: transform 70ms linear; }
 .main-mic .mic-volume { right: 12px; bottom: 7px; left: 12px; background: rgb(10 10 10 / 14%); }
@@ -241,6 +241,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .voice-status-line { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .voice-card p { margin: 8px 0 0; color: var(--muted); font-size: 0.83rem; line-height: 1.45; }
 .voice-card blockquote { margin: 12px 0 0; font-size: 0.92rem; font-weight: 800; }
+.voice-confirm { width: 100%; margin-top: 16px; padding: 14px 18px; border: 0; border-radius: var(--radius-pill); color: var(--paper); background: var(--ink); font: inherit; font-weight: 900; cursor: pointer; }
 .draft-score-chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
 .draft-score-chips span { font-size: 0.76rem; }
 .draft-score-chips strong { margin-left: 4px; font-size: 1rem; }

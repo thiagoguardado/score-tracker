@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { spokenRanking } from "../domain/ranking";
 import { parseGameVoiceCommand } from "../domain/voiceParser";
 import { getMessages, type Locale } from "../i18n";
-import { getSpeechErrorCode, listenOnce, requiresUserGestureBetweenRecognitions, speak, stopAudio, supportsRecognition } from "../speech";
+import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase, VoiceStatus } from "../types";
 
 type PendingAction = "undo" | "finish" | null;
@@ -24,6 +24,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
   const initialStatus = (): VoiceStatus => ({ phase: "idle", transcript: "", message: messages.voice.idleMessage });
   const [status, setStatus] = useState<VoiceStatus>(initialStatus);
   const [waitingForTap, setWaitingForTap] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
   const [volume, setVolume] = useState(0);
   const sessionActive = useRef(false);
   const pendingScoresRef = useRef<Record<PlayerId, number> | undefined>(undefined);
@@ -68,7 +69,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
 
   const hear = async (draftScores?: Record<PlayerId, number>): Promise<string> => {
     let lastError: unknown;
-    const attempts = requiresUserGestureBetweenRecognitions() ? 1 : 2;
+    const attempts = 1;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       updateStatus(
         "starting",
@@ -119,6 +120,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
       pendingScoresRef.current = pendingScores;
       pendingActionRef.current = pendingAction;
       omittedNamesRef.current = omittedNames;
+      setConfirmationPending(Boolean(pendingScores || pendingAction));
     };
     const clearPending = () => {
       pendingScores = undefined;
@@ -129,7 +131,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
 
     try {
       while (sessionActive.current) {
-        if (capturesThisActivation > 0 && requiresUserGestureBetweenRecognitions()) {
+        if (capturesThisActivation > 0) {
           preservePending();
           pausedForGesture = true;
           setWaitingForTap(true);
@@ -281,9 +283,41 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     pendingActionRef.current = null;
     omittedNamesRef.current = [];
     setWaitingForTap(false);
+    setConfirmationPending(false);
     stopAudio();
     setStatus(initialStatus());
   }, [locale]);
 
-  return { status, activate, cancel, waitingForTap, supported: supportsRecognition(), volume };
+  const confirmPending = useCallback(() => {
+    const scores = pendingScoresRef.current;
+    const action = pendingActionRef.current;
+    if (!scores && !action) return;
+
+    sessionActive.current = false;
+    stopAudio();
+    pendingScoresRef.current = undefined;
+    pendingActionRef.current = null;
+    omittedNamesRef.current = [];
+    setWaitingForTap(false);
+    setConfirmationPending(false);
+
+    void (async () => {
+      updateStatus("applying", messages.voice.phase.applying, statusRef.current.transcript, scores);
+      if (scores) {
+        const nextRound: Round = { id: "preview", createdAt: new Date().toISOString(), source: "voice", scores };
+        onAddRound(scores);
+        await say(`${messages.voice.roundSaved} ${spokenRanking(game, locale, [...game.rounds, nextRound])}`, "speaking-ranking");
+      } else if (action === "undo") {
+        const last = game.rounds.at(-1);
+        if (last) onDeleteRound(last.id);
+        await say(`${messages.voice.lastRoundUndone} ${spokenRanking(game, locale, game.rounds.slice(0, -1))}`, "speaking-ranking");
+      } else if (action === "finish") {
+        onFinish();
+        await say(`${messages.voice.gameFinished} ${spokenRanking(game, locale)}`, "speaking-ranking");
+      }
+      setStatus(initialStatus());
+    })();
+  }, [game, locale, messages, onAddRound, onDeleteRound, onFinish]);
+
+  return { status, activate, release: finishListening, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume };
 }

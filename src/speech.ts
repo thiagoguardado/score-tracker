@@ -3,6 +3,7 @@ import type { Locale } from "./i18n";
 type ActiveRecognitionSession = {
   recognition: SpeechRecognition;
   cancel: (error: Error) => void;
+  finish: () => void;
   released: Promise<void>;
 };
 
@@ -81,6 +82,10 @@ export function stopAudio(): void {
   if (supportsSynthesis()) window.speechSynthesis.cancel();
   speakingResolve?.();
   speakingResolve = null;
+}
+
+export function finishListening(): void {
+  activeRecognition?.finish();
 }
 
 export async function listenOnce(
@@ -176,12 +181,22 @@ export async function listenOnce(
       }
       forceRelease();
     };
+    const finish = () => {
+      if (settled || terminalError) return;
+      window.clearTimeout(timeout);
+      try {
+        recognition.stop();
+      } catch {
+        // Releasing before audio starts may already have ended the service.
+      }
+      forceRelease();
+    };
     const armTimeout = (duration: number) => {
       window.clearTimeout(timeout);
       timeout = window.setTimeout(() => cancel(new SpeechRecognitionFailure("timed-out")), duration);
     };
 
-    activeRecognition = { recognition, cancel, released };
+    activeRecognition = { recognition, cancel, finish, released };
     armTimeout(timeoutMs);
     if (onVolume) stopVolumeMeter = startVolumeMeter(onVolume);
 
@@ -246,6 +261,7 @@ let currentVolume = 0;
 
 function ensureVolumeMeter(): Promise<void> {
   if (volumeStream?.active) {
+    volumeStream.getTracks().forEach((track) => { track.enabled = true; });
     return volumeContext?.state === "suspended" ? volumeContext.resume() : Promise.resolve();
   }
   if (volumeStart) return volumeStart;
@@ -296,7 +312,32 @@ function startVolumeMeter(onVolume: (level: number) => void): () => void {
   return () => {
     volumeSubscribers.delete(onVolume);
     onVolume(0);
+    if (volumeSubscribers.size === 0) pauseVolumeCapture();
   };
+}
+
+function pauseVolumeCapture(): void {
+  volumeStream?.getTracks().forEach((track) => { track.enabled = false; });
+  if (volumeContext?.state === "running") void volumeContext.suspend();
+  currentVolume = 0;
+}
+
+function releaseVolumeCapture(): void {
+  if (volumeFrame !== undefined) cancelAnimationFrame(volumeFrame);
+  volumeFrame = undefined;
+  volumeStream?.getTracks().forEach((track) => track.stop());
+  volumeStream = undefined;
+  volumeStart = undefined;
+  currentVolume = 0;
+  if (volumeContext && volumeContext.state !== "closed") void volumeContext.close();
+  volumeContext = undefined;
+  volumeSubscribers.forEach((subscriber) => subscriber(0));
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) releaseVolumeCapture();
+  });
 }
 
 export function speak(text: string, locale: Locale): Promise<void> {
@@ -305,6 +346,7 @@ export function speak(text: string, locale: Locale): Promise<void> {
       resolve();
       return;
     }
+    pauseVolumeCapture();
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     const language = speechLocale(locale);

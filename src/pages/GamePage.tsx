@@ -300,6 +300,7 @@ export default function GamePage() {
             {voice.status.draftScores && <div className="draft-score-chips">
               {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
             </div>}
+            {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
           </section>
           <aside className="command-help" aria-label={messages.game.commandHelpTitle}>
             <strong>{messages.game.commandHelpTitle}</strong>
@@ -317,7 +318,21 @@ export default function GamePage() {
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
           aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
-          onClick={() => { void wake.request(); voice.activate(); }}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            void wake.request();
+            voice.activate();
+          }}
+          onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
+          onPointerCancel={voice.cancel}
+          onKeyDown={(event) => {
+            if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
+              void wake.request();
+              voice.activate();
+            }
+          }}
+          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
         >
           <span><span aria-hidden="true">🎙️</span> {voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${voice.volume})` }} /></span>

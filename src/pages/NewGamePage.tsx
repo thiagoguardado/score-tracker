@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LanguageSelect } from "../components/LanguageSelect";
-import { ThemeSelect } from "../components/ThemeSelect";
 import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
 import { useVoiceModel } from "../localTranscription";
-import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
+import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
@@ -25,6 +23,7 @@ function setupSpeechError(code: string, messages: Messages): string {
   if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.setup.permissionSpeechError(code);
   if (code === "no-speech") return messages.setup.noSpeechError;
   if (code === "audio-capture") return messages.setup.audioCaptureError;
+  if (code === "pcm-stalled") return messages.voice.pcmStalled;
   if (code === "network") return messages.setup.networkSpeechError;
   if (code === "aborted") return messages.setup.interruptedSpeechError;
   if (code === "language-not-supported") return messages.setup.languageSpeechError;
@@ -41,7 +40,9 @@ export default function NewGamePage() {
   const [volume, setVolume] = useState(0);
   const [error, setError] = useState("");
   const voiceModel = useVoiceModel();
+  const microphone = useMicrophoneHealth();
   const running = useRef(false);
+  const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
 
   useEffect(() => {
     if (running.current) {
@@ -168,36 +169,16 @@ export default function NewGamePage() {
   return (
     <main className="page setup-page">
       <header className="topbar">
-        <button className="text-action" onClick={() => navigate("/")}>{messages.common.back}</button>
+        <button className="text-action" onClick={() => navigate("/")}>{messages.common.home}</button>
         <span>{messages.setup.newGame}</span>
-        <div className="preference-selects">
-          <LanguageSelect />
-          <ThemeSelect />
-        </div>
+        <span aria-hidden="true" />
       </header>
 
       <section className="setup-hero">
         <p className="eyebrow">{messages.setup.whoIsPlaying}</p>
         <h1>{messages.setup.registerByVoice}</h1>
         <p>{messages.setup.voiceDescription}</p>
-        <button
-          className={`setup-mic ${voiceActive ? "active" : ""}`}
-          disabled={voiceModel.phase !== "ready"}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            void runVoiceSetup();
-          }}
-          onPointerUp={(event) => { event.preventDefault(); finishListening(); }}
-          onPointerCancel={() => { stopAudio(); }}
-          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) void runVoiceSetup(); }}
-          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") finishListening(); }}
-        >
-          <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
-          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${volume})` }} /></span>
-        </button>
-        <VoiceModelStatus status={voiceModel} />
-        {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
+        {(voiceActive || voiceMessage !== messages.setup.namesHint) && <p className="setup-voice-feedback" aria-live="polite">{voiceMessage}</p>}
       </section>
 
       <section className="manual-setup" aria-labelledby="players-title">
@@ -226,6 +207,31 @@ export default function NewGamePage() {
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button" onClick={startManually}>{messages.setup.startGame}</button>
       </section>
+
+      <div className="voice-dock setup-voice-dock">
+        <button
+          className={`main-mic ${voiceActive ? "active" : ""}`}
+          disabled={!modelUsable}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            void runVoiceSetup();
+          }}
+          onPointerUp={(event) => { event.preventDefault(); finishListening(); }}
+          onPointerCancel={() => { stopAudio(); }}
+          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) void runVoiceSetup(); }}
+          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") finishListening(); }}
+        >
+          <strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong>
+          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
+        </button>
+        <div className="voice-dock-copy">
+          <small>{messages.setup.namesHint}</small>
+          <VoiceModelStatus status={voiceModel} compact />
+        </div>
+      </div>
+
+      {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
     </main>
   );
 }

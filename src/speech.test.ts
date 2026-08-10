@@ -6,19 +6,22 @@ import {
   listenOnce,
   releaseMicrophoneCapture,
   speak,
-  SpeechRecognitionFailure,
+  SpeechCaptureFailure,
   stopAudio,
 } from "./speech";
 
-vi.mock("./localTranscription", () => ({ transcribeLocally: vi.fn() }));
+vi.mock("./localTranscription", () => ({
+  prepareVoiceModel: vi.fn(),
+  transcribeLocally: vi.fn(),
+}));
 
-class FakeTrack {
+class FakeTrack extends EventTarget {
   enabled = true;
-  readyState = "live";
-  onended: (() => void) | null = null;
+  readyState: MediaStreamTrackState = "live";
+  muted = false;
   stop() {
     this.readyState = "ended";
-    this.onended?.();
+    this.dispatchEvent(new Event("ended"));
   }
 }
 
@@ -26,48 +29,59 @@ class FakeStream {
   active = true;
   track = new FakeTrack();
   getTracks() { return [this.track]; }
+  getAudioTracks() { return [this.track]; }
 }
 
-class FakeAudioContext {
+type PortMessage = { type: string; open?: boolean; captureId?: number };
+
+class FakePort {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  captureId = 0;
+  gateOpen = false;
+
+  postMessage(message: PortMessage) {
+    if (message.type !== "gate") return;
+    this.captureId = message.captureId ?? 0;
+    this.gateOpen = Boolean(message.open);
+    if (!message.open) queueMicrotask(() => this.emit({ type: "flushed", captureId: this.captureId }));
+  }
+
+  emit(data: unknown) {
+    this.onmessage?.(new MessageEvent("message", { data }));
+  }
+
+  emitAudio(audio: Float32Array, rms = 0.05) {
+    this.emitHealth(rms, audio.length);
+    if (this.gateOpen) this.emit({ type: "pcm", captureId: this.captureId, audio });
+  }
+
+  emitHealth(rms = 0.05, samplesReceived = 128) {
+    this.emit({ type: "health", framesReceived: 2, samplesReceived, rms, peak: rms * 2 });
+  }
+}
+
+class FakeAudioWorkletNode {
+  static instances: FakeAudioWorkletNode[] = [];
+  port = new FakePort();
+  constructor() {
+    FakeAudioWorkletNode.instances.push(this);
+    window.setTimeout(() => {
+      this.port.emit({ type: "ready", sampleRate: 48_000 });
+      this.port.emit({ type: "health", framesReceived: 1, samplesReceived: 128, rms: 0, peak: 0 });
+    }, 0);
+  }
+  connect<T>(target: T): T { return target; }
+}
+
+class FakeAudioContext extends EventTarget {
   state: AudioContextState = "running";
-  createAnalyser() {
-    return { fftSize: 256, getFloatTimeDomainData: (samples: Float32Array) => samples.fill(0) };
-  }
-  createMediaStreamSource() { return { connect: vi.fn() }; }
-  async decodeAudioData() { return { duration: 0.1 } as AudioBuffer; }
-  async resume() { this.state = "running"; }
-  async suspend() { this.state = "suspended"; }
-  async close() { this.state = "closed"; }
-}
-
-class FakeOfflineAudioContext {
+  sampleRate = 48_000;
   destination = {};
-  createBufferSource() { return { buffer: null, connect: vi.fn(), start: vi.fn() }; }
-  async startRendering() { return { getChannelData: () => new Float32Array(1_600) }; }
-}
-
-class FakeMediaRecorder extends EventTarget {
-  static instances: FakeMediaRecorder[] = [];
-  static isTypeSupported() { return true; }
-  state: RecordingState = "inactive";
-  mimeType: string;
-  constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
-    super();
-    this.mimeType = options?.mimeType ?? "audio/mp4";
-    FakeMediaRecorder.instances.push(this);
-  }
-  start() { this.state = "recording"; }
-  emitData() {
-    const data = Object.assign(new Event("dataavailable"), { data: new Blob([new Uint8Array([1, 2, 3])], { type: this.mimeType }) });
-    this.dispatchEvent(data);
-  }
-  stop() {
-    this.state = "inactive";
-    queueMicrotask(() => {
-      this.emitData();
-      this.dispatchEvent(new Event("stop"));
-    });
-  }
+  audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+  createMediaStreamSource() { return { connect: <T>(target: T) => target }; }
+  createGain() { return { gain: { value: 1 }, connect: <T>(target: T) => target }; }
+  async resume() { this.state = "running"; }
+  async close() { this.state = "closed"; }
 }
 
 class FakeUtterance {
@@ -80,54 +94,100 @@ class FakeUtterance {
   constructor(text: string) { this.text = text; }
 }
 
-async function recordAndFinish(locale: "en" | "pt-BR") {
-  const result = listenOnce(locale);
-  await vi.waitFor(() => expect(FakeMediaRecorder.instances.at(-1)?.state).toBe("recording"));
-  finishListening();
-  return result;
+async function startCapture(locale: "en" | "pt-BR") {
+  const onCaptureStart = vi.fn();
+  const result = listenOnce(locale, 10_000, [], onCaptureStart);
+  await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
+  return { result, node: FakeAudioWorkletNode.instances.at(-1)! };
 }
 
-describe("local speech capture", () => {
+describe("AudioWorklet speech capture", () => {
   let getUserMedia: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    FakeMediaRecorder.instances = [];
+    FakeAudioWorkletNode.instances = [];
     getUserMedia = vi.fn().mockResolvedValue(new FakeStream());
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
     vi.stubGlobal("AudioContext", FakeAudioContext);
-    vi.stubGlobal("OfflineAudioContext", FakeOfflineAudioContext);
-    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    vi.stubGlobal("AudioWorkletNode", FakeAudioWorkletNode);
     vi.mocked(transcribeLocally).mockResolvedValue("Mario five");
   });
 
   afterEach(() => {
     stopAudio();
     releaseMicrophoneCapture();
-    vi.useRealTimers();
     vi.unstubAllGlobals();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
   });
 
-  it("records once and sends 16 kHz audio with the selected locale", async () => {
-    await expect(recordAndFinish("pt-BR")).resolves.toBe("Mario five");
-    expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), "pt-BR");
-    expect(vi.mocked(transcribeLocally).mock.calls[0]?.[0]).toHaveLength(1_600);
+  it("sends raw PCM and its source sample rate to the selected local language", async () => {
+    const { result, node } = await startCapture("pt-BR");
+    node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await expect(result).resolves.toBe("Mario five");
+    expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), 48_000, "pt-BR", "final");
   });
 
-  it("reuses one microphone stream across consecutive commands", async () => {
-    await recordAndFinish("en");
-    await recordAndFinish("en");
+  it("keeps one microphone and AudioWorklet pipeline across consecutive presses", async () => {
+    const first = await startCapture("en");
+    first.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await first.result;
+
+    const second = await startCapture("en");
+    second.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await second.result;
+
     expect(getUserMedia).toHaveBeenCalledTimes(1);
-    expect(transcribeLocally).toHaveBeenCalledTimes(2);
+    expect(FakeAudioWorkletNode.instances).toHaveLength(1);
   });
 
-  it("reports a local interim transcript while recording and a final result on release", async () => {
+  it("reconnects the pipeline on the next user press after returning from the background", async () => {
+    const first = await startCapture("en");
+    first.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await first.result;
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    const second = await startCapture("en");
+    second.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await second.result;
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(FakeAudioWorkletNode.instances).toHaveLength(2);
+  });
+
+  it("does not send silent PCM to Whisper", async () => {
+    const { result, node } = await startCapture("en");
+    node.port.emitAudio(new Float32Array(4_800), 0);
+    finishListening();
+    await expect(result).rejects.toMatchObject({ code: "no-speech" });
+    expect(transcribeLocally).not.toHaveBeenCalled();
+  });
+
+  it("fails fast when the microphone stays live but PCM frames stop", async () => {
+    const { result } = await startCapture("en");
+    await expect(result).rejects.toMatchObject({ code: "pcm-stalled" });
+    expect(transcribeLocally).not.toHaveBeenCalled();
+  }, 3_000);
+
+  it("publishes a live partial transcript before the final result", async () => {
     vi.mocked(transcribeLocally).mockResolvedValueOnce("Mario").mockResolvedValueOnce("Mario five");
     const onInterim = vi.fn();
-    const result = listenOnce("en", 10_000, [], undefined, undefined, onInterim);
-    await vi.waitFor(() => expect(FakeMediaRecorder.instances.at(-1)?.state).toBe("recording"));
-    FakeMediaRecorder.instances.at(-1)?.emitData();
-    await vi.waitFor(() => expect(onInterim).toHaveBeenCalledWith("Mario"));
+    const onCaptureStart = vi.fn();
+    const result = listenOnce("en", 10_000, [], onCaptureStart, undefined, onInterim);
+    await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
+    const port = FakeAudioWorkletNode.instances.at(-1)!.port;
+    port.emitAudio(new Float32Array(60_000).fill(0.05));
+    const healthTimer = window.setInterval(() => port.emitHealth(), 200);
+    await vi.waitFor(() => expect(onInterim).toHaveBeenCalledWith("Mario"), { timeout: 2_500 });
+    window.clearInterval(healthTimer);
     finishListening();
     await expect(result).resolves.toBe("Mario five");
   });
@@ -136,19 +196,18 @@ describe("local speech capture", () => {
     releaseMicrophoneCapture();
     getUserMedia.mockRejectedValueOnce(new Error("No audio input device"));
     const failure = await listenOnce("pt-BR").catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(SpeechRecognitionFailure);
+    expect(failure).toBeInstanceOf(SpeechCaptureFailure);
     expect(failure).toMatchObject({ code: "audio-capture", detail: "No audio input device" });
     expect(getSpeechErrorCode(failure)).toBe("audio-capture");
   });
 
   it("reports an intentional interruption as aborted", async () => {
-    const result = listenOnce("en");
-    await vi.waitFor(() => expect(FakeMediaRecorder.instances.at(-1)?.state).toBe("recording"));
+    const { result } = await startCapture("en");
     stopAudio();
     await expect(result).rejects.toMatchObject({ code: "aborted" });
   });
 
-  it("configures synthesis for the selected language", async () => {
+  it("configures synthesis for the selected language without disposing the microphone", async () => {
     let utterance: FakeUtterance | undefined;
     vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
     Object.defineProperty(window, "speechSynthesis", {

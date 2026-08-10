@@ -1,28 +1,66 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { Locale } from "./i18n";
+import type { TranscriptionKind } from "./voice/SpeechEngine";
 import TranscriptionWorker from "./workers/transcription.worker?worker";
 
 export type VoiceModelStatus = {
-  phase: "idle" | "downloading" | "ready" | "transcribing" | "error";
+  phase: "idle" | "downloading" | "initializing" | "ready" | "transcribing" | "error";
   progress: number;
   loaded: number;
   total: number;
+  offlineReady: boolean;
+  device?: "webgpu" | "wasm";
   error?: string;
 };
 
-let status: VoiceModelStatus = { phase: "idle", progress: 0, loaded: 0, total: 0 };
+type PendingRequest = {
+  resolve: (text: string) => void;
+  reject: (error: Error) => void;
+  kind: TranscriptionKind;
+};
+
+let status: VoiceModelStatus = { phase: "idle", progress: 0, loaded: 0, total: 0, offlineReady: false };
 const subscribers = new Set<() => void>();
-const pending = new Map<number, { resolve: (text: string) => void; reject: (error: Error) => void }>();
+const pending = new Map<number, PendingRequest>();
 let nextRequestId = 1;
 let worker: Worker | undefined;
-const REQUIRED_MODEL_FILES = [
-  "https://huggingface.co/onnx-community/whisper-tiny/resolve/main/onnx/encoder_model_quantized.onnx",
-  "https://huggingface.co/onnx-community/whisper-tiny/resolve/main/onnx/decoder_model_merged_quantized.onnx",
-];
+let cacheChecked = false;
+let initializationTimer: number | undefined;
+
+function clearInitializationTimer(): void {
+  window.clearTimeout(initializationTimer);
+  initializationTimer = undefined;
+}
+
+function armInitializationTimer(): void {
+  if (initializationTimer !== undefined) return;
+  initializationTimer = window.setTimeout(() => {
+    initializationTimer = undefined;
+    if (status.phase !== "initializing") return;
+    if (status.device === "webgpu") {
+      destroyWorker();
+      publish({ phase: "initializing", progress: 100, loaded: status.loaded, total: status.total, offlineReady: false, device: "wasm" });
+      getWorker().postMessage({ type: "load", preferWebGpu: false });
+      return;
+    }
+    destroyWorker();
+    publish({ ...status, phase: "error", error: "voice-engine-initialization-timed-out" });
+  }, 60_000);
+}
 
 function publish(next: VoiceModelStatus) {
   status = next;
   subscribers.forEach((subscriber) => subscriber());
+}
+
+function rejectPending(error: Error): void {
+  pending.forEach(({ reject }) => reject(error));
+  pending.clear();
+}
+
+function destroyWorker(): void {
+  worker?.terminate();
+  worker = undefined;
 }
 
 function getWorker(): Worker {
@@ -33,20 +71,49 @@ function getWorker(): Worker {
     if (message.type === "progress") {
       const progress = message.progress;
       if (progress?.status === "progress_total") {
+        const percent = Math.min(100, Number(progress.progress) || 0);
         publish({
-          phase: "downloading",
-          progress: Number(progress.progress) || 0,
+          ...status,
+          phase: percent >= 99.9 ? "initializing" : "downloading",
+          progress: percent,
           loaded: Number(progress.loaded) || status.loaded,
           total: Number(progress.total) || status.total,
+          error: undefined,
         });
+        if (percent >= 99.9) armInitializationTimer();
       } else if (status.phase === "idle" || status.phase === "error") {
-        publish({ phase: "downloading", progress: 0, loaded: 0, total: 0 });
+        publish({ ...status, phase: "downloading", progress: 0, loaded: 0, total: 0, error: undefined });
       }
       return;
     }
+    if (message.type === "initializing") {
+      publish({ ...status, phase: "initializing", progress: 100, device: message.device });
+      return;
+    }
+    if (message.type === "attempt") {
+      publish({ ...status, device: message.device });
+      return;
+    }
+    if (message.type === "fallback") {
+      clearInitializationTimer();
+      publish({ ...status, phase: "initializing", device: "wasm", error: undefined });
+      return;
+    }
+    if (message.type === "cache-found") {
+      if (status.phase === "idle") prepareVoiceModel();
+      return;
+    }
     if (message.type === "ready") {
-      publish({ ...status, phase: "ready", progress: 100 });
-      void navigator.storage?.persist?.();
+      clearInitializationTimer();
+      publish({
+        ...status,
+        phase: "ready",
+        progress: 100,
+        offlineReady: Boolean(message.offlineReady),
+        device: message.device,
+        error: undefined,
+      });
+      if (message.offlineReady) void navigator.storage?.persist?.();
       return;
     }
     if (message.type === "result") {
@@ -56,41 +123,60 @@ function getWorker(): Worker {
       return;
     }
     if (message.type === "error") {
+      clearInitializationTimer();
       const error = new Error(message.message || "local-transcription-error");
       if (message.id !== undefined) {
         pending.get(message.id)?.reject(error);
         pending.delete(message.id);
+      } else {
+        rejectPending(error);
       }
       publish({ ...status, phase: "error", error: error.message });
     }
   });
   worker.addEventListener("error", (event) => {
-    publish({ ...status, phase: "error", error: event.message || "worker-error" });
+    clearInitializationTimer();
+    const error = new Error(event.message || "worker-error");
+    rejectPending(error);
+    publish({ ...status, phase: "error", error: error.message });
   });
   return worker;
 }
 
 export function prepareVoiceModel(): void {
-  if (status.phase === "ready" || status.phase === "downloading" || status.phase === "transcribing") return;
-  publish({ phase: "downloading", progress: 0, loaded: 0, total: 0 });
-  getWorker().postMessage({ type: "load" });
+  if (status.phase === "ready" || status.phase === "downloading" || status.phase === "initializing" || status.phase === "transcribing") return;
+  if (status.phase === "error") destroyWorker();
+  publish({ phase: "downloading", progress: 0, loaded: 0, total: 0, offlineReady: false });
+  const preferWebGpu = "gpu" in navigator && Boolean((navigator as Navigator & { gpu?: unknown }).gpu);
+  getWorker().postMessage({ type: "load", preferWebGpu });
 }
 
-export function transcribeLocally(audio: Float32Array, locale: Locale): Promise<string> {
+export function transcribeLocally(
+  audio: Float32Array,
+  sampleRate: number,
+  locale: Locale,
+  kind: TranscriptionKind = "final",
+): Promise<string> {
   const id = nextRequestId++;
   publish({ ...status, phase: "transcribing" });
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    getWorker().postMessage({ type: "transcribe", id, audio, language: locale === "pt-BR" ? "pt" : "en" }, [audio.buffer]);
+    pending.set(id, { resolve, reject, kind });
+    getWorker().postMessage({
+      type: "transcribe",
+      id,
+      audio,
+      sampleRate,
+      language: locale === "pt-BR" ? "pt" : "en",
+      kind,
+    }, [audio.buffer]);
   });
 }
 
 export function useVoiceModel(): VoiceModelStatus {
   useEffect(() => {
-    if (!("caches" in window) || status.phase !== "idle") return;
-    void Promise.all(REQUIRED_MODEL_FILES.map((url) => caches.match(url))).then((matches) => {
-      if (matches.every(Boolean)) prepareVoiceModel();
-    });
+    if (cacheChecked || status.phase !== "idle") return;
+    cacheChecked = true;
+    getWorker().postMessage({ type: "check-cache" });
   }, []);
   return useSyncExternalStore(
     (subscriber) => { subscribers.add(subscriber); return () => subscribers.delete(subscriber); },

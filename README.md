@@ -65,9 +65,9 @@ Portuguese examples:
 
 ## Offline voice recognition
 
-The app uses `getUserMedia`, `MediaRecorder`, Transformers.js, and the multilingual `onnx-community/whisper-tiny` model. It does not use `SpeechRecognition`, Siri, or a transcription API. The same microphone stream feeds both the volume meter and recording, avoiding competing iOS audio capture APIs.
+The app uses `getUserMedia`, one persistent `AudioContext`, an `AudioWorklet`, Transformers.js, and the multilingual `onnx-community/whisper-tiny` model. It does not use `SpeechRecognition`, `MediaRecorder`, Siri, or a transcription API. The worklet continuously verifies that PCM frames are flowing; push-to-talk only gates which samples are sent to Whisper, so consecutive commands do not recreate the iOS microphone session.
 
-The first visit to a voice screen downloads the quantized model weights and the local WASM engine (about 70 MB combined). The UI reports download progress. Transformers.js keeps the model in the browser cache, while the service worker precaches the app and WASM runtime. Later sessions can transcribe offline unless the browser evicts site storage.
+The first visit to a voice screen downloads the quantized model weights and the local engine (about 70 MB combined). The UI distinguishes downloading from device initialization and only reports offline readiness after Transformers.js verifies the model cache. WebGPU is attempted when available; a timed or failed initialization falls back to WASM. The service worker precaches the app and WASM runtime. Later sessions can transcribe offline unless the browser evicts site storage.
 
 Whisper Tiny is multilingual, so English and Portuguese share one model download. The selected app language is passed to every local transcription request and changes immediately when the language selector changes.
 

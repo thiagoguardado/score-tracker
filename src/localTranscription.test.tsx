@@ -24,20 +24,24 @@ it("reports model progress and sends the current app language with each local tr
   const { result } = renderHook(() => useVoiceModel());
   act(() => prepareVoiceModel());
   const worker = workerState.instances[0];
-  expect(worker?.messages).toContainEqual({ type: "load" });
+  expect(worker?.messages).toContainEqual({ type: "load", preferWebGpu: false });
 
   act(() => emit({ type: "progress", progress: { status: "progress_total", progress: 42, loaded: 21, total: 50 } }));
   expect(result.current).toMatchObject({ phase: "downloading", progress: 42, loaded: 21, total: 50 });
-  act(() => emit({ type: "ready" }));
-  expect(result.current.phase).toBe("ready");
+  act(() => emit({ type: "attempt", device: "wasm" }));
+  act(() => emit({ type: "progress", progress: { status: "progress_total", progress: 100, loaded: 50, total: 50 } }));
+  expect(result.current).toMatchObject({ phase: "initializing", progress: 100, device: "wasm" });
+  act(() => emit({ type: "ready", device: "wasm", offlineReady: true }));
+  expect(result.current).toMatchObject({ phase: "ready", device: "wasm", offlineReady: true });
 
-  const portuguese = transcribeLocally(new Float32Array([0.1]), "pt-BR");
+  const portuguese = transcribeLocally(new Float32Array([0.1]), 16_000, "pt-BR");
   const portugueseMessage = worker?.messages.at(-1) as { id: number; language: string };
   expect(portugueseMessage.language).toBe("pt");
+  expect(portugueseMessage).toMatchObject({ sampleRate: 16_000, kind: "final" });
   act(() => emit({ type: "result", id: portugueseMessage.id, text: "Mário cinco" }));
   await expect(portuguese).resolves.toBe("Mário cinco");
 
-  const english = transcribeLocally(new Float32Array([0.1]), "en");
+  const english = transcribeLocally(new Float32Array([0.1]), 16_000, "en");
   const englishMessage = worker?.messages.at(-1) as { id: number; language: string };
   expect(englishMessage.language).toBe("en");
   act(() => emit({ type: "result", id: englishMessage.id, text: "Mario five" }));

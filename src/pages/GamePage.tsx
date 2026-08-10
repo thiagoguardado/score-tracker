@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { LanguageSelect } from "../components/LanguageSelect";
-import { ThemeSelect } from "../components/ThemeSelect";
 import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
@@ -9,6 +7,7 @@ import { useWakeLock } from "../hooks/useWakeLock";
 import { useI18n, type Locale, type Messages } from "../i18n";
 import { useVoiceModel } from "../localTranscription";
 import { useAppStore } from "../store";
+import { releaseMicrophoneCapture } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase } from "../types";
 
 type Panel = "ranking" | "history" | "players";
@@ -233,9 +232,15 @@ export default function GamePage() {
   const wake = useWakeLock(Boolean(game && game.status === "active" && wakeEnabled));
   const ranking = useMemo(() => game ? rankingFor(game, game.rounds, locale) : [], [game, locale]);
 
+  useEffect(() => {
+    if (game?.status === "finished") releaseMicrophoneCapture();
+  }, [game?.status]);
+
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
-  const voiceActive = !voice.waitingForTap && voice.status.phase !== "idle" && voice.status.phase !== "error";
+  const voiceActive = voice.status.phase === "starting" || voice.status.phase === "listening";
+  const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
+  const showVoiceCard = voice.status.phase !== "idle" || voice.confirmationPending;
 
   const share = async () => {
     const text = shareText(game, locale);
@@ -264,11 +269,9 @@ export default function GamePage() {
   return (
     <main className={`game-page ${game.status === "finished" ? "finished" : ""}`}>
       <header className="game-topbar">
-        <button className="text-action on-dark" onClick={() => navigate("/")}>{messages.home.history}</button>
+        <button className="text-action" onClick={() => navigate("/")}>{messages.common.home}</button>
         <div className="game-title"><small>{game.status === "active" ? messages.game.active : messages.game.finalResult}</small><strong>{formatGameDate(game.startedAt, locale)}</strong></div>
         <div className="game-topbar-actions">
-          <LanguageSelect onDark />
-          <ThemeSelect onDark />
           {game.status === "active" && (
             <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? messages.game.keepScreenAwakeOff : messages.game.keepScreenAwakeOn} onClick={() => setWakeEnabled((value) => !value)}>
               {wakeEnabled ? messages.game.screenOn : messages.game.screenOff}
@@ -281,6 +284,15 @@ export default function GamePage() {
         <div className="scoreboard-heading">
           <div><p className="eyebrow">{messages.game.roundCount(game.rounds.length)}</p><h1>{panelTitle}</h1></div>
         </div>
+
+        <nav className="game-nav" aria-label={messages.game.navigation}>
+          <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><span>{messages.game.ranking}</span></button>
+          <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><span>{messages.game.rounds}</span></button>
+          <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><span>{messages.game.players}</span></button>
+          {game.status === "active" && <button className="finish-nav" onClick={() => {
+            if (window.confirm(messages.game.finishConfirm)) finishGame(game.id);
+          }}><span>{messages.game.finish}</span></button>}
+        </nav>
 
         {panel === "ranking" && <div className="ranking-list" aria-label={messages.game.currentRanking}>
           {ranking.map(({ player, total, position }, index) => (
@@ -295,7 +307,7 @@ export default function GamePage() {
         {panel === "history" && <HistoryPanel game={game} canEdit={canEdit} updateRound={(roundId, scores) => updateRound(game.id, roundId, scores)} deleteRound={(roundId) => deleteRound(game.id, roundId)} />}
         {panel === "players" && <PlayersPanel game={game} canEdit={canEdit} renamePlayer={(playerId, name) => renamePlayer(game.id, playerId, name)} addPlayer={(name) => addPlayer(game.id, name)} removePlayer={(playerId) => removePlayer(game.id, playerId)} />}
 
-        {game.status === "active" && panel === "ranking" && <>
+        {game.status === "active" && panel === "ranking" && showVoiceCard && <>
           <section className={`voice-card phase-${voice.status.phase}`} aria-live="polite">
             <div className="voice-status-line"><strong>{currentPhase}</strong></div>
             <p>{voice.status.message}</p>
@@ -304,12 +316,7 @@ export default function GamePage() {
               {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
             </div>}
             {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
-            <VoiceModelStatus status={voiceModel} />
           </section>
-          <aside className="command-help" aria-label={messages.game.commandHelpTitle}>
-            <strong>{messages.game.commandHelpTitle}</strong>
-            <span>{messages.game.commandHelp}</span>
-          </aside>
         </>}
 
         {game.status === "finished" && panel === "ranking" && <div className="result-actions">
@@ -321,7 +328,7 @@ export default function GamePage() {
       {game.status === "active" && <div className="voice-dock">
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={voiceModel.phase !== "ready"}
+          disabled={!modelUsable}
           aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onPointerDown={(event) => {
             event.preventDefault();
@@ -339,21 +346,16 @@ export default function GamePage() {
           }}
           onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
         >
-          <span><span aria-hidden="true">🎙️</span> {voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
-          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${voice.volume})` }} /></span>
+          <strong>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</strong>
+          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
         </button>
-        <div><strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong><small>{voice.supported ? messages.game.sayNamesAndScores : messages.game.voiceUnavailable}</small></div>
+        <div className="voice-dock-copy">
+          {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
+          <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
+          <VoiceModelStatus status={voiceModel} compact />
+        </div>
         <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
       </div>}
-
-      <nav className="game-nav" aria-label={messages.game.navigation}>
-        <button className={panel === "ranking" ? "active" : ""} onClick={() => setPanel("ranking")}><span>{messages.game.ranking}</span></button>
-        <button className={panel === "history" ? "active" : ""} onClick={() => setPanel("history")}><span>{messages.game.rounds}</span></button>
-        <button className={panel === "players" ? "active" : ""} onClick={() => setPanel("players")}><span>{messages.game.players}</span></button>
-        {game.status === "active" && <button className="finish-nav" onClick={() => {
-          if (window.confirm(messages.game.finishConfirm)) finishGame(game.id);
-        }}><span>{messages.game.finish}</span></button>}
-      </nav>
 
       {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}
       {toast && <div className="toast" role="status">{toast}</div>}

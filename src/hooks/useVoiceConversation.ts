@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { spokenRanking } from "../domain/ranking";
 import { parseGameVoiceCommand } from "../domain/voiceParser";
 import { getMessages, type Locale } from "../i18n";
-import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
+import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase, VoiceStatus } from "../types";
 
 type PendingAction = "undo" | "finish" | null;
@@ -26,6 +26,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
   const [waitingForTap, setWaitingForTap] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [volume, setVolume] = useState(0);
+  const microphone = useMicrophoneHealth();
   const sessionActive = useRef(false);
   const pendingScoresRef = useRef<Record<PlayerId, number> | undefined>(undefined);
   const pendingActionRef = useRef<PendingAction>(null);
@@ -100,8 +101,19 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     const code = getSpeechErrorCode(error);
     if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.voice.microphonePermissionDiagnostic(code);
     if (code.includes("unavailable")) return messages.voice.unavailableBrowser;
+    if (code.includes("pcm-stalled")) return messages.voice.pcmStalled;
+    if (code.includes("microphone-interrupted")) return messages.voice.microphoneInterrupted;
+    if (code.includes("aborted")) return messages.voice.microphoneInterrupted;
+    if (code.includes("no-speech")) return messages.voice.noVoice;
     return messages.voice.failedSafelyDiagnostic(code);
   };
+
+  useEffect(() => {
+    if (!sessionActive.current) return;
+    if (microphone.problem === "no-voice") updateStatus("listening", messages.voice.noVoice, statusRef.current.transcript, pendingScoresRef.current);
+    if (microphone.problem === "pcm-stalled") updateStatus("error", messages.voice.pcmStalled, statusRef.current.transcript, pendingScoresRef.current);
+    if (microphone.problem === "microphone-interrupted") updateStatus("error", messages.voice.microphoneInterrupted, statusRef.current.transcript, pendingScoresRef.current);
+  }, [microphone.problem, messages]);
 
   const run = useCallback(async () => {
     if (!supportsRecognition()) {
@@ -320,5 +332,5 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     })();
   }, [game, locale, messages, onAddRound, onDeleteRound, onFinish]);
 
-  return { status, activate, release: finishListening, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume };
+  return { status, activate, release: finishListening, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume, microphone };
 }

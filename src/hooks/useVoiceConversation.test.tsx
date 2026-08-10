@@ -12,6 +12,7 @@ vi.mock("../speech", () => ({
   speak: vi.fn().mockResolvedValue(undefined),
   stopAudio: vi.fn(),
   supportsRecognition: vi.fn(() => true),
+  useMicrophoneHealth: vi.fn(() => ({ phase: "ready", rms: 0, peak: 0, framesReceived: 1, samplesReceived: 128, lastFrameAt: 1, trackState: "live", trackMuted: false, contextState: "running" })),
 }));
 
 const game: Game = {

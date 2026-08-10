@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { ThemeSelect } from "../components/ThemeSelect";
 import { rankingFor } from "../domain/ranking";
 import { useI18n, type Locale, type Messages } from "../i18n";
 import { useAppStore } from "../store";
+import { releaseMicrophoneCapture } from "../speech";
 
 function formatStartedAt(value: string, locale: Locale, messages: Messages): string {
   const date = new Date(value);
@@ -19,6 +21,10 @@ export default function HomePage() {
   const { locale, messages } = useI18n();
   const { state, deleteGame, storageHealthy } = useAppStore();
   const games = [...state.games].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+
+  useEffect(() => {
+    releaseMicrophoneCapture();
+  }, []);
 
   const removeGame = (gameId: string) => {
     if (window.confirm(messages.home.deleteGameConfirm)) deleteGame(gameId);

@@ -88,6 +88,7 @@ export async function listenOnce(
   timeoutMs = 10_000,
   preferredPhrases: string[] = [],
   onCaptureStart?: () => void,
+  onVolume?: (level: number) => void,
 ): Promise<string> {
   if (activeRecognition) {
     const previous = activeRecognition;
@@ -113,6 +114,7 @@ export async function listenOnce(
     let timeout: number | undefined;
     let releaseFallback: number | undefined;
     let abortFallback: number | undefined;
+    let stopVolumeMeter: (() => void) | undefined;
     let releaseSession: () => void = () => {};
     const released = new Promise<void>((release) => {
       releaseSession = release;
@@ -122,6 +124,8 @@ export async function listenOnce(
       window.clearTimeout(timeout);
       window.clearTimeout(releaseFallback);
       window.clearTimeout(abortFallback);
+      stopVolumeMeter?.();
+      onVolume?.(0);
       recognition.onstart = null;
       recognition.onaudiostart = null;
       recognition.onsoundstart = null;
@@ -184,6 +188,7 @@ export async function listenOnce(
     recognition.onaudiostart = () => {
       armTimeout(timeoutMs);
       onCaptureStart?.();
+      if (onVolume) stopVolumeMeter = startVolumeMeter(onVolume);
     };
     recognition.onsoundstart = () => armTimeout(MAX_UTTERANCE_MS);
     recognition.onspeechstart = () => armTimeout(MAX_UTTERANCE_MS);
@@ -230,6 +235,55 @@ export async function listenOnce(
       settleAfterEnd();
     }
   });
+}
+
+function startVolumeMeter(onVolume: (level: number) => void): () => void {
+  let cancelled = false;
+  let frame: number | undefined;
+  let stream: MediaStream | undefined;
+  let context: AudioContext | undefined;
+  let smoothed = 0;
+
+  void navigator.mediaDevices?.getUserMedia({ audio: true }).then(async (mediaStream) => {
+    if (cancelled) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    stream = mediaStream;
+    context = new AudioContext();
+    if (context.state === "suspended") await context.resume();
+    if (cancelled) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      if (context.state !== "closed") await context.close();
+      return;
+    }
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    context.createMediaStreamSource(mediaStream).connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+
+    const measure = () => {
+      analyser.getFloatTimeDomainData(samples);
+      const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+      const normalized = Math.min(1, Math.max(0, (rms - 0.008) / 0.16));
+      smoothed = Math.max(normalized, smoothed * 0.72);
+      onVolume(smoothed);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+  }).catch(() => {
+    // The speech session remains usable when raw microphone analysis is unavailable.
+    stream?.getTracks().forEach((track) => track.stop());
+    if (context && context.state !== "closed") void context.close();
+    onVolume(0);
+  });
+
+  return () => {
+    cancelled = true;
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    stream?.getTracks().forEach((track) => track.stop());
+    if (context && context.state !== "closed") void context.close();
+  };
 }
 
 export function speak(text: string, locale: Locale): Promise<void> {

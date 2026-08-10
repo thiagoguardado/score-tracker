@@ -24,6 +24,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
   const initialStatus = (): VoiceStatus => ({ phase: "idle", transcript: "", message: messages.voice.idleMessage });
   const [status, setStatus] = useState<VoiceStatus>(initialStatus);
   const [waitingForTap, setWaitingForTap] = useState(false);
+  const [volume, setVolume] = useState(0);
   const sessionActive = useRef(false);
   const pendingScoresRef = useRef<Record<PlayerId, number> | undefined>(undefined);
   const pendingActionRef = useRef<PendingAction>(null);
@@ -81,6 +82,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
           10_000,
           game.players.map((player) => player.name),
           () => updateStatus("listening", messages.voice.listening, draftScores ? statusRef.current.transcript : "", draftScores),
+          setVolume,
         );
       } catch (error) {
         lastError = error;
@@ -251,6 +253,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     } finally {
       sessionActive.current = false;
       stopAudio();
+      setVolume(0);
       if (!pausedForGesture) {
         setWaitingForTap(false);
         setStatus((current) => current.phase === "error" ? current : { ...initialStatus(), transcript: current.transcript });
@@ -282,5 +285,5 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     setStatus(initialStatus());
   }, [locale]);
 
-  return { status, activate, cancel, waitingForTap, supported: supportsRecognition() };
+  return { status, activate, cancel, waitingForTap, supported: supportsRecognition(), volume };
 }

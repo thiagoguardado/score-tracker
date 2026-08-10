@@ -320,6 +320,7 @@ export default function GamePage() {
           onClick={() => { void wake.request(); voice.activate(); }}
         >
           <span><span aria-hidden="true">🎙️</span> {voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
+          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${voice.volume})` }} /></span>
         </button>
         <div><strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong><small>{voice.supported ? messages.game.sayNamesAndScores : messages.game.voiceUnavailable}</small></div>
         <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>

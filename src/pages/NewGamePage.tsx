@@ -36,6 +36,7 @@ export default function NewGamePage() {
   const [fields, setFields] = useState<NameField[]>([newField(), newField()]);
   const [voiceMessage, setVoiceMessage] = useState(messages.setup.namesHint);
   const [voiceActive, setVoiceActive] = useState(false);
+  const [volume, setVolume] = useState(0);
   const [error, setError] = useState("");
   const running = useRef(false);
 
@@ -93,7 +94,7 @@ export default function NewGamePage() {
         setVoiceMessage(messages.setup.startingMicrophone);
         let transcript: string;
         try {
-          transcript = await listenOnce(locale, 10_000, [], () => setVoiceMessage(messages.setup.listening));
+          transcript = await listenOnce(locale, 10_000, [], () => setVoiceMessage(messages.setup.listening), setVolume);
           capturesThisActivation += 1;
           recognitionRetryAvailable = true;
         } catch (voiceError) {
@@ -156,6 +157,7 @@ export default function NewGamePage() {
     } finally {
       running.current = false;
       stopAudio();
+      setVolume(0);
       setVoiceActive(false);
       setVoiceMessage(pausedForGesture ? messages.setup.tapToContinue : messages.setup.namesHint);
     }
@@ -178,6 +180,7 @@ export default function NewGamePage() {
         <p>{messages.setup.voiceDescription}</p>
         <button className={`setup-mic ${voiceActive ? "active" : ""}`} onClick={() => void runVoiceSetup()}>
           <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
+          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${volume})` }} /></span>
         </button>
         {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
       </section>

@@ -178,6 +178,12 @@ h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", Inter, sa
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
+.setup-mic, .main-mic { position: relative; overflow: hidden; }
+.mic-volume { position: absolute; right: 14px; bottom: 8px; left: 14px; height: 3px; overflow: hidden; border-radius: var(--radius-pill); background: rgb(255 255 255 / 20%); }
+.mic-volume > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: currentColor; transform: scaleX(0); transform-origin: left center; transition: transform 70ms linear; }
+.main-mic .mic-volume { right: 12px; bottom: 7px; left: 12px; background: rgb(10 10 10 / 14%); }
+.main-mic.active .mic-volume { background: rgb(255 255 255 / 18%); }
+@media (prefers-reduced-motion: reduce) { .mic-volume > span { transition: none; } }
 .setup-mic:hover { transform: translateY(-2px); }
 .setup-mic.active { box-shadow: 0 0 0 7px var(--soft), var(--soft-shadow); }
 .setup-mic strong, .setup-mic small { display: block; }

@@ -27,12 +27,11 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await page.getByLabel("Thiago", { exact: true }).fill("10");
   await expect(page.getByLabel("Mario", { exact: true })).toHaveAttribute("inputmode", "numeric");
   await page.getByLabel("Mario", { exact: true }).fill("7");
-  await page.getByRole("button", { name: "Toggle sign for Mario's score" }).click({ force: true });
-  await page.getByRole("button", { name: "Confirm round" }).click({ force: true });
+  await page.getByRole("button", { name: "Toggle sign for Mario's score" }).click();
+  await page.getByRole("button", { name: "Confirm round" }).click();
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();
   await expect(page.getByText("-7", { exact: true })).toBeVisible();
-  await page.waitForTimeout(200); // Prevent net::ERR_ABORTED if reload happens too fast after state update
   await page.reload();
   await expect(page.getByText("10", { exact: true })).toBeVisible();
   await expect(page.getByText("-7", { exact: true })).toBeVisible();
@@ -53,17 +52,17 @@ test("edits and deletes rounds from history", async ({ page }) => {
   await page.getByRole("button", { name: "Type" }).click();
   await page.getByLabel("Ana", { exact: true }).fill("4");
   await page.getByLabel("Bia", { exact: true }).fill("6");
-  await page.getByRole("button", { name: "Confirm round" }).click({ force: true });
+  await page.getByRole("button", { name: "Confirm round" }).click();
 
-  await page.getByRole("button", { name: "Rounds" }).click({ force: true });
-  await page.getByRole("button", { name: "Edit round 1" }).click({ force: true });
+  await page.getByRole("button", { name: "Rounds" }).click();
+  await page.getByRole("button", { name: "Edit round 1" }).click();
   await page.getByLabel("Ana", { exact: true }).fill("9");
-  await page.getByRole("button", { name: "Confirm round" }).click({ force: true });
+  await page.getByRole("button", { name: "Confirm round" }).click();
   await expect(page.getByText("9", { exact: true })).toBeVisible();
 
   await Promise.all([
     page.waitForEvent("dialog").then((dialog) => dialog.accept()),
-    page.getByRole("button", { name: "Delete round 1" }).click({ force: true }),
+    page.getByRole("button", { name: "Delete round 1" }).click(),
   ]);
   await expect(page.getByText("No rounds yet")).toBeVisible();
 });

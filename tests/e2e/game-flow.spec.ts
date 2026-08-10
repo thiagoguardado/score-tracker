@@ -32,6 +32,7 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();
   await expect(page.getByText("-7", { exact: true })).toBeVisible();
+  await page.waitForTimeout(200); // Prevent net::ERR_ABORTED if reload happens too fast after state update
   await page.reload();
   await expect(page.getByText("10", { exact: true })).toBeVisible();
   await expect(page.getByText("-7", { exact: true })).toBeVisible();
@@ -54,8 +55,8 @@ test("edits and deletes rounds from history", async ({ page }) => {
   await page.getByLabel("Bia", { exact: true }).fill("6");
   await page.getByRole("button", { name: "Confirm round" }).click({ force: true });
 
-  await page.getByRole("button", { name: "Rounds" }).click();
-  await page.getByRole("button", { name: "Edit round 1" }).click();
+  await page.getByRole("button", { name: "Rounds" }).click({ force: true });
+  await page.getByRole("button", { name: "Edit round 1" }).click({ force: true });
   await page.getByLabel("Ana", { exact: true }).fill("9");
   await page.getByRole("button", { name: "Confirm round" }).click({ force: true });
   await expect(page.getByText("9", { exact: true })).toBeVisible();

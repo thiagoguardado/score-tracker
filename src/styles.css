@@ -306,14 +306,6 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .score-field input { width: 100%; min-height: 45px; text-align: right; font-size: 1.15rem; font-weight: 900; }
 .score-sign-button { min-height: 45px; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--surface-muted); color: var(--ink); font-weight: 900; }
 
-.diagnostics-page { max-width: 760px; }
-.diagnostics-hero, .diagnostics-events { margin-top: 24px; padding: clamp(24px, 6vw, 48px); border-radius: var(--radius-large); background: var(--surface); box-shadow: var(--shadow-soft); }
-.diagnostics-hero h1 { margin: 6px 0 12px; font-size: clamp(2.2rem, 10vw, 4.5rem); line-height: 0.95; }
-.diagnostics-hero .primary-button { margin-top: 24px; }
-.diagnostics-events ol { display: grid; gap: 8px; margin: 20px 0; padding: 0; list-style: none; }
-.diagnostics-events li { display: grid; grid-template-columns: 74px minmax(120px, auto) 1fr; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.diagnostics-events time, .diagnostics-events small { color: var(--ink-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.75rem; }
-.diagnostics-events li span { overflow-wrap: anywhere; }
 .toast { position: fixed; z-index: 70; bottom: calc(104px + env(safe-area-inset-bottom)); left: 50%; padding: 13px 20px; border: 0; border-radius: var(--radius-pill); color: #ffffff; background: #0a0a0a; box-shadow: var(--floating-shadow); font-size: 0.82rem; font-weight: 900; transform: translateX(-50%); }
 
 @media (min-width: 760px) {

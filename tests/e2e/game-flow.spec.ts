@@ -8,6 +8,8 @@ test.beforeEach(async ({ page }) => {
 
 test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await page.getByRole("button", { name: /new game/i }).click();
+  await expect(page.getByRole("button", { name: "Download offline voice" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hold to say players" })).toBeDisabled();
   await page.getByLabel("Player 1 name").fill("Thiago");
   await page.getByLabel("Player 2 name").fill("Mario");
   await page.getByRole("button", { name: "Start game" }).click();

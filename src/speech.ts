@@ -1,18 +1,16 @@
 import type { Locale } from "./i18n";
+import { transcribeLocally } from "./localTranscription";
 
-type ActiveRecognitionSession = {
-  recognition: SpeechRecognition;
+type ActiveCaptureSession = {
   cancel: (error: Error) => void;
   finish: () => void;
   released: Promise<void>;
 };
 
-let activeRecognition: ActiveRecognitionSession | null = null;
+let activeCapture: ActiveCaptureSession | null = null;
 let speakingResolve: (() => void) | null = null;
 
-const RECOGNITION_RELEASE_GRACE_MS = 750;
-const RECOGNITION_ABORT_GRACE_MS = 250;
-const MAX_UTTERANCE_MS = 60_000;
+const TARGET_SAMPLE_RATE = 16_000;
 const SYNTHESIS_RELEASE_GRACE_MS = 150;
 
 export class SpeechRecognitionFailure extends Error {
@@ -35,42 +33,13 @@ export function getSpeechErrorCode(error: unknown): string {
 
 const speechLocale = (locale: Locale) => locale === "pt-BR" ? "pt-BR" : "en-US";
 
-function normalizeRecognitionPhrase(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("en")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function preferredTranscript(result: SpeechRecognitionResult, preferredPhrases: string[]): string {
-  const normalizedPhrases = preferredPhrases.map(normalizeRecognitionPhrase).filter(Boolean);
-  let bestTranscript = result[0]?.transcript ?? "";
-  let bestScore = -1;
-  const alternativeCount = result.length || 1;
-
-  for (let index = 0; index < alternativeCount; index += 1) {
-    const candidate = result[index]?.transcript ?? "";
-    const padded = ` ${normalizeRecognitionPhrase(candidate)} `;
-    const score = normalizedPhrases.filter((phrase) => padded.includes(` ${phrase} `)).length;
-    if (score > bestScore) {
-      bestScore = score;
-      bestTranscript = candidate;
-    }
-  }
-  return bestTranscript;
-}
-
-export function requiresUserGestureBetweenRecognitions(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
-    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
 export function supportsRecognition(): boolean {
-  return typeof window !== "undefined" && Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+  return typeof window !== "undefined"
+    && Boolean(navigator.mediaDevices?.getUserMedia)
+    && "MediaRecorder" in window
+    && "AudioContext" in window
+    && "OfflineAudioContext" in window
+    && "Worker" in window;
 }
 
 export function supportsSynthesis(): boolean {
@@ -78,209 +47,48 @@ export function supportsSynthesis(): boolean {
 }
 
 export function stopAudio(): void {
-  activeRecognition?.cancel(new SpeechRecognitionFailure("aborted"));
+  activeCapture?.cancel(new SpeechRecognitionFailure("aborted"));
   if (supportsSynthesis()) window.speechSynthesis.cancel();
   speakingResolve?.();
   speakingResolve = null;
 }
 
 export function finishListening(): void {
-  activeRecognition?.finish();
-}
-
-export async function listenOnce(
-  locale: Locale,
-  timeoutMs = 10_000,
-  preferredPhrases: string[] = [],
-  onCaptureStart?: () => void,
-  onVolume?: (level: number) => void,
-): Promise<string> {
-  if (activeRecognition) {
-    const previous = activeRecognition;
-    previous.cancel(new SpeechRecognitionFailure("aborted"));
-    await previous.released;
-  }
-
-  return new Promise((resolve, reject) => {
-    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Recognition) {
-      reject(new Error("speech-unavailable"));
-      return;
-    }
-
-    const recognition = new Recognition();
-    recognition.lang = speechLocale(locale);
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = preferredPhrases.length > 0 ? 5 : 1;
-    let settled = false;
-    let transcript = "";
-    let terminalError: Error | null = null;
-    let timeout: number | undefined;
-    let releaseFallback: number | undefined;
-    let abortFallback: number | undefined;
-    let stopVolumeMeter: (() => void) | undefined;
-    let releaseSession: () => void = () => {};
-    const released = new Promise<void>((release) => {
-      releaseSession = release;
-    });
-
-    const cleanup = () => {
-      window.clearTimeout(timeout);
-      window.clearTimeout(releaseFallback);
-      window.clearTimeout(abortFallback);
-      stopVolumeMeter?.();
-      onVolume?.(0);
-      recognition.onstart = null;
-      recognition.onaudiostart = null;
-      recognition.onsoundstart = null;
-      recognition.onspeechstart = null;
-      recognition.onspeechend = null;
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      if (activeRecognition?.recognition === recognition) activeRecognition = null;
-      releaseSession();
-    };
-    const succeed = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(transcript.trim());
-    };
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(error);
-    };
-    const settleAfterEnd = () => {
-      if (transcript) succeed();
-      else fail(terminalError ?? new SpeechRecognitionFailure("no-speech"));
-    };
-    const forceRelease = () => {
-      window.clearTimeout(releaseFallback);
-      window.clearTimeout(abortFallback);
-      releaseFallback = window.setTimeout(() => {
-        try {
-          recognition.abort();
-        } catch {
-          // The service may already be disconnected.
-        }
-        abortFallback = window.setTimeout(settleAfterEnd, RECOGNITION_ABORT_GRACE_MS);
-      }, RECOGNITION_RELEASE_GRACE_MS);
-    };
-    const cancel = (error: Error) => {
-      if (settled || terminalError) return;
-      terminalError = error;
-      window.clearTimeout(timeout);
-      try {
-        recognition.abort();
-      } catch {
-        // The service may not have started yet, but the promise still has to settle.
-      }
-      forceRelease();
-    };
-    const finish = () => {
-      if (settled || terminalError) return;
-      window.clearTimeout(timeout);
-      try {
-        recognition.stop();
-      } catch {
-        // Releasing before audio starts may already have ended the service.
-      }
-      forceRelease();
-    };
-    const armTimeout = (duration: number) => {
-      window.clearTimeout(timeout);
-      timeout = window.setTimeout(() => cancel(new SpeechRecognitionFailure("timed-out")), duration);
-    };
-
-    activeRecognition = { recognition, cancel, finish, released };
-    armTimeout(timeoutMs);
-    if (onVolume) stopVolumeMeter = startVolumeMeter(onVolume);
-
-    recognition.onstart = () => armTimeout(timeoutMs);
-    recognition.onaudiostart = () => {
-      armTimeout(timeoutMs);
-      onCaptureStart?.();
-    };
-    recognition.onsoundstart = () => armTimeout(MAX_UTTERANCE_MS);
-    recognition.onspeechstart = () => armTimeout(MAX_UTTERANCE_MS);
-    recognition.onspeechend = () => {
-      window.clearTimeout(timeout);
-      try {
-        recognition.stop();
-      } catch {
-        // A final result may already have stopped the service.
-      }
-      forceRelease();
-    };
-
-    recognition.onresult = (event) => {
-      const recognitionResult = event.results[event.resultIndex];
-      const result = recognitionResult ? preferredTranscript(recognitionResult, preferredPhrases) : "";
-      if (!result) return;
-      transcript = result;
-      terminalError = null;
-      window.clearTimeout(timeout);
-      try {
-        recognition.stop();
-      } catch {
-        // Wait for end when the service has already begun shutting down.
-      }
-      forceRelease();
-    };
-    recognition.onerror = (event) => {
-      if (terminalError || (transcript && event.error === "aborted")) {
-        forceRelease();
-        return;
-      }
-      const failure = new SpeechRecognitionFailure(event.error || "speech-error", event.message || "");
-      console.warn("Speech recognition failed", { code: failure.code, detail: failure.detail });
-      terminalError = failure;
-      forceRelease();
-    };
-    recognition.onend = settleAfterEnd;
-
-    try {
-      recognition.start();
-    } catch (error) {
-      terminalError = error instanceof Error ? error : new Error("speech-start-error");
-      settleAfterEnd();
-    }
-  });
+  activeCapture?.finish();
 }
 
 const volumeSubscribers = new Set<(level: number) => void>();
 let volumeStream: MediaStream | undefined;
 let volumeContext: AudioContext | undefined;
-let volumeStart: Promise<void> | undefined;
+let volumeStart: Promise<MediaStream> | undefined;
 let volumeFrame: number | undefined;
 let currentVolume = 0;
 
-function ensureVolumeMeter(): Promise<void> {
+function resetVolumeCapture(): void {
+  if (volumeFrame !== undefined) cancelAnimationFrame(volumeFrame);
+  volumeFrame = undefined;
+  volumeStream = undefined;
+  volumeStart = undefined;
+  currentVolume = 0;
+  volumeSubscribers.forEach((subscriber) => subscriber(0));
+  if (volumeContext && volumeContext.state !== "closed") void volumeContext.close();
+  volumeContext = undefined;
+}
+
+async function ensureMicrophone(): Promise<MediaStream> {
   if (volumeStream?.active) {
     volumeStream.getTracks().forEach((track) => { track.enabled = true; });
-    return volumeContext?.state === "suspended" ? volumeContext.resume() : Promise.resolve();
+    if (volumeContext?.state === "suspended") await volumeContext.resume();
+    return volumeStream;
   }
   if (volumeStart) return volumeStart;
-  if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve();
+  if (!navigator.mediaDevices?.getUserMedia) throw new SpeechRecognitionFailure("audio-capture");
 
-  volumeStart = navigator.mediaDevices.getUserMedia({ audio: true }).then(async (stream) => {
+  volumeStart = navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  }).then(async (stream) => {
     volumeStream = stream;
-    stream.getTracks().forEach((track) => {
-      track.onended = () => {
-        if (volumeFrame !== undefined) cancelAnimationFrame(volumeFrame);
-        volumeFrame = undefined;
-        volumeStream = undefined;
-        volumeStart = undefined;
-        currentVolume = 0;
-        volumeSubscribers.forEach((subscriber) => subscriber(0));
-        if (volumeContext && volumeContext.state !== "closed") void volumeContext.close();
-        volumeContext = undefined;
-      };
-    });
+    stream.getTracks().forEach((track) => { track.onended = resetVolumeCapture; });
     volumeContext = new AudioContext();
     if (volumeContext.state === "suspended") await volumeContext.resume();
     const analyser = volumeContext.createAnalyser();
@@ -297,23 +105,12 @@ function ensureVolumeMeter(): Promise<void> {
       volumeFrame = requestAnimationFrame(measure);
     };
     measure();
-  }).catch(() => {
+    return stream;
+  }).catch((error) => {
     volumeStart = undefined;
-    volumeSubscribers.forEach((subscriber) => subscriber(0));
+    throw new SpeechRecognitionFailure("audio-capture", error instanceof Error ? error.message : String(error));
   });
   return volumeStart;
-}
-
-function startVolumeMeter(onVolume: (level: number) => void): () => void {
-  volumeSubscribers.add(onVolume);
-  onVolume(currentVolume);
-  void ensureVolumeMeter();
-
-  return () => {
-    volumeSubscribers.delete(onVolume);
-    onVolume(0);
-    if (volumeSubscribers.size === 0) pauseVolumeCapture();
-  };
 }
 
 function pauseVolumeCapture(): void {
@@ -322,21 +119,158 @@ function pauseVolumeCapture(): void {
   currentVolume = 0;
 }
 
-function releaseVolumeCapture(): void {
-  if (volumeFrame !== undefined) cancelAnimationFrame(volumeFrame);
-  volumeFrame = undefined;
-  volumeStream?.getTracks().forEach((track) => track.stop());
-  volumeStream = undefined;
-  volumeStart = undefined;
-  currentVolume = 0;
-  if (volumeContext && volumeContext.state !== "closed") void volumeContext.close();
-  volumeContext = undefined;
-  volumeSubscribers.forEach((subscriber) => subscriber(0));
+export function releaseMicrophoneCapture(): void {
+  const stream = volumeStream;
+  resetVolumeCapture();
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+function startVolumeMeter(onVolume: (level: number) => void): () => void {
+  volumeSubscribers.add(onVolume);
+  onVolume(currentVolume);
+  return () => {
+    volumeSubscribers.delete(onVolume);
+    onVolume(0);
+    if (volumeSubscribers.size === 0) pauseVolumeCapture();
+  };
+}
+
+function preferredRecordingMimeType(): string | undefined {
+  return ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]
+    .find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+async function decodeAndResample(blob: Blob): Promise<Float32Array> {
+  const decodingContext = new AudioContext();
+  try {
+    const decoded = await decodingContext.decodeAudioData(await blob.arrayBuffer());
+    const frameCount = Math.max(1, Math.ceil(decoded.duration * TARGET_SAMPLE_RATE));
+    const offline = new OfflineAudioContext(1, frameCount, TARGET_SAMPLE_RATE);
+    const source = offline.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offline.destination);
+    source.start();
+    const rendered = await offline.startRendering();
+    return new Float32Array(rendered.getChannelData(0));
+  } finally {
+    if (decodingContext.state !== "closed") await decodingContext.close();
+  }
+}
+
+export async function listenOnce(
+  locale: Locale,
+  timeoutMs = 10_000,
+  _preferredPhrases: string[] = [],
+  onCaptureStart?: () => void,
+  onVolume?: (level: number) => void,
+  onInterimTranscript?: (text: string) => void,
+): Promise<string> {
+  if (activeCapture) {
+    const previous = activeCapture;
+    previous.cancel(new SpeechRecognitionFailure("aborted"));
+    await previous.released;
+  }
+
+  return new Promise((resolve, reject) => {
+    let recorder: MediaRecorder | undefined;
+    let timeout: number | undefined;
+    let stopMeter: (() => void) | undefined;
+    let terminalError: Error | undefined;
+    let finishRequested = false;
+    let partialInFlight = false;
+    let settled = false;
+    const chunks: Blob[] = [];
+    let releaseSession: () => void = () => {};
+    const released = new Promise<void>((release) => { releaseSession = release; });
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      stopMeter?.();
+      if (activeCapture?.released === released) activeCapture = null;
+      releaseSession();
+    };
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const succeed = (text: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (text.trim()) resolve(text.trim());
+      else reject(new SpeechRecognitionFailure("no-speech"));
+    };
+    const finish = () => {
+      finishRequested = true;
+      window.clearTimeout(timeout);
+      if (recorder?.state === "recording") recorder.stop();
+    };
+    const cancel = (error: Error) => {
+      if (settled) return;
+      terminalError = error;
+      if (recorder?.state === "recording") recorder.stop();
+      else fail(error);
+    };
+
+    activeCapture = { cancel, finish, released };
+    timeout = window.setTimeout(finish, timeoutMs);
+
+    void (async () => {
+      try {
+        const stream = await ensureMicrophone();
+        if (settled) return;
+        if (onVolume) stopMeter = startVolumeMeter(onVolume);
+        const mimeType = preferredRecordingMimeType();
+        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        recorder.addEventListener("dataavailable", (event) => {
+          if (event.data.size === 0) return;
+          chunks.push(event.data);
+          if (!onInterimTranscript || partialInFlight || recorder?.state !== "recording") return;
+          partialInFlight = true;
+          const partialBlob = new Blob([...chunks], { type: recorder.mimeType || mimeType });
+          void decodeAndResample(partialBlob)
+            .then((audio) => transcribeLocally(audio, locale))
+            .then((text) => { if (!settled && text) onInterimTranscript(text); })
+            .catch(() => { /* A final complete recording is still processed on release. */ })
+            .finally(() => { partialInFlight = false; });
+        });
+        recorder.addEventListener("error", () => fail(new SpeechRecognitionFailure("audio-capture")));
+        recorder.addEventListener("stop", () => {
+          stopMeter?.();
+          stopMeter = undefined;
+          if (terminalError) {
+            fail(terminalError);
+            return;
+          }
+          void (async () => {
+            try {
+              const blob = new Blob(chunks, { type: recorder?.mimeType || mimeType });
+              if (blob.size === 0) throw new SpeechRecognitionFailure("no-speech");
+              const audio = await decodeAndResample(blob);
+              succeed(await transcribeLocally(audio, locale));
+            } catch (error) {
+              fail(error instanceof Error ? error : new Error(String(error)));
+            }
+          })();
+        });
+        recorder.start(1_500);
+        onCaptureStart?.();
+        if (finishRequested) finish();
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
+      }
+    })();
+  });
 }
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) releaseVolumeCapture();
+    if (document.hidden) {
+      activeCapture?.cancel(new SpeechRecognitionFailure("aborted"));
+      releaseMicrophoneCapture();
+    }
   });
 }
 

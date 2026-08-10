@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { ThemeSelect } from "../components/ThemeSelect";
+import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
+import { useVoiceModel } from "../localTranscription";
 import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition } from "../speech";
 import { useAppStore } from "../store";
 
@@ -38,6 +40,7 @@ export default function NewGamePage() {
   const [voiceActive, setVoiceActive] = useState(false);
   const [volume, setVolume] = useState(0);
   const [error, setError] = useState("");
+  const voiceModel = useVoiceModel();
   const running = useRef(false);
 
   useEffect(() => {
@@ -93,7 +96,14 @@ export default function NewGamePage() {
         setVoiceMessage(messages.setup.startingMicrophone);
         let transcript: string;
         try {
-          transcript = await listenOnce(locale, 10_000, [], () => setVoiceMessage(messages.setup.listening), setVolume);
+          transcript = await listenOnce(
+            locale,
+            10_000,
+            [],
+            () => setVoiceMessage(messages.setup.listening),
+            setVolume,
+            (partial) => setVoiceMessage(`“${partial}”`),
+          );
           capturesThisActivation += 1;
         } catch (voiceError) {
           throw voiceError;
@@ -172,6 +182,7 @@ export default function NewGamePage() {
         <p>{messages.setup.voiceDescription}</p>
         <button
           className={`setup-mic ${voiceActive ? "active" : ""}`}
+          disabled={voiceModel.phase !== "ready"}
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -185,6 +196,7 @@ export default function NewGamePage() {
           <span><strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong><small>{voiceMessage}</small></span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${volume})` }} /></span>
         </button>
+        <VoiceModelStatus status={voiceModel} />
         {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
       </section>
 

@@ -30,6 +30,16 @@ const englishMessages = {
     manual: "Manual",
     byVoice: "By voice",
   },
+  voiceModel: {
+    download: "Download offline voice",
+    downloading: "Downloading offline voice model",
+    preparing: "Preparing offline voice recognition…",
+    ready: "Offline voice recognition ready",
+    transcribing: "Transcribing on this device…",
+    error: "The offline voice model could not be loaded.",
+    retry: "Try download again",
+    size: "One multilingual download for English and Portuguese (about 70 MB including the offline engine).",
+  },
   home: {
     tagline: "Your game-night scoreboard",
     newGame: "New game",
@@ -194,6 +204,16 @@ const englishMessages = {
 const portugueseMessages: Messages = {
   meta: { title: "Placar", description: "Um placar de jogos operado principalmente por voz." },
   common: { language: "Idioma", theme: "Tema", system: "Sistema", light: "Claro", dark: "Escuro", english: "English", portuguese: "Português", close: "Fechar", back: "Voltar", cancel: "Cancelar", confirm: "Confirmar", add: "Adicionar", edit: "Editar", delete: "Excluir", manual: "Manual", byVoice: "Por voz" },
+  voiceModel: {
+    download: "Baixar voz offline",
+    downloading: "Baixando modelo de voz offline",
+    preparing: "Preparando reconhecimento de voz offline…",
+    ready: "Reconhecimento de voz offline pronto",
+    transcribing: "Transcrevendo neste aparelho…",
+    error: "Não foi possível carregar o modelo de voz offline.",
+    retry: "Tentar baixar novamente",
+    size: "Um único download multilíngue para inglês e português (cerca de 70 MB incluindo o mecanismo offline).",
+  },
   home: {
     tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores por voz", savedOnDevice: "Salvo neste aparelho", history: "Histórico",
     firstGame: "Sua primeira partida começa aqui", emptyDescription: "Os jogos e todas as rodadas ficam salvos automaticamente neste aparelho.",

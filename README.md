@@ -1,24 +1,26 @@
 # Scoreboard
 
-A mobile-first, voice-first PWA for keeping score during game night. It has no backend, database, AI service, analytics, or audio storage.
+A mobile-first, voice-first PWA for keeping score during game night. It has no backend, database, remote AI service, analytics, or persistent audio storage.
 
 The app is English-first and currently includes Brazilian Portuguese. On first use it follows the browser language, falls back to English, and remembers a manual language choice across sessions. Voice recognition, spoken feedback, and commands always follow the selected app language.
 
 ## Features
 
-- add and review players through one continuous voice conversation;
-- enter, repeat, correct, and confirm a round without another tap;
+- add and review players with push-to-talk voice input;
+- enter, repeat, and correct a round by voice, then confirm it with one button;
 - voice commands for ranking, saved rounds, undo, and finishing a game;
 - complete manual entry and editing as a fallback;
 - multiple games stored on the device;
 - rankings recalculated from rounds, including shared positions for ties;
 - native result sharing with clipboard fallback;
-- installable PWA with offline access to the manual app and saved data;
+- local Whisper Tiny speech recognition running in a Web Worker with no transcription API calls;
+- progressive local transcription while the push-to-talk button is held;
+- installable PWA with offline access to voice, the manual app, and saved data after the initial model download;
 - Screen Wake Lock during active games when supported.
 - monochrome, text-only interface with no decorative images or in-app icons.
 - system, light, and dark themes with a persistent manual preference.
 
-No persistent action is applied until it is confirmed. Audio is never recorded or stored.
+No persistent action is applied until it is confirmed. Short push-to-talk recordings exist only in memory while they are transcribed and are never persisted or uploaded.
 
 ## Development
 
@@ -61,20 +63,22 @@ Portuguese examples:
 - `desfazer a última rodada`
 - `finalizar jogo`
 
-## Voice on iPhone
+## Offline voice recognition
 
-Use Safari with Siri enabled and allow microphone access when requested. Speech recognition is provided by the browser and operating system, so manual entry remains available throughout the app.
+The app uses `getUserMedia`, `MediaRecorder`, Transformers.js, and the multilingual `onnx-community/whisper-tiny` model. It does not use `SpeechRecognition`, Siri, or a transcription API. The same microphone stream feeds both the volume meter and recording, avoiding competing iOS audio capture APIs.
+
+The first visit to a voice screen downloads the quantized model weights and the local WASM engine (about 70 MB combined). The UI reports download progress. Transformers.js keeps the model in the browser cache, while the service worker precaches the app and WASM runtime. Later sessions can transcribe offline unless the browser evicts site storage.
+
+Whisper Tiny is multilingual, so English and Portuguese share one model download. The selected app language is passed to every local transcription request and changes immediately when the language selector changes.
 
 The required device flow is:
 
-1. tap the microphone once;
-2. say player names and scores;
-3. listen to the review;
-4. say `repeat` or correct a value;
-5. say `confirm`;
+1. wait until offline voice recognition is ready;
+2. press and hold the voice button;
+3. say player names, scores, or a command while partial text appears;
+4. release to produce the final transcript;
+5. review the recognized values and press `Confirm`;
 6. listen to the complete ranking.
-
-The app and saved games work offline, but speech recognition may depend on system-provided services.
 
 ## Data
 

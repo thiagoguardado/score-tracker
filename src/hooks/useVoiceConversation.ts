@@ -84,6 +84,7 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
           game.players.map((player) => player.name),
           () => updateStatus("listening", messages.voice.listening, draftScores ? statusRef.current.transcript : "", draftScores),
           setVolume,
+          (partial) => updateStatus("listening", messages.voice.listening, partial, draftScores),
         );
       } catch (error) {
         lastError = error;

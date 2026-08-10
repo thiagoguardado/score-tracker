@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { ThemeSelect } from "../components/ThemeSelect";
+import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { useI18n, type Locale, type Messages } from "../i18n";
+import { useVoiceModel } from "../localTranscription";
 import { useAppStore } from "../store";
 import type { Game, PlayerId, Round, VoicePhase } from "../types";
 
@@ -214,6 +216,7 @@ export default function GamePage() {
   const [editingFinished, setEditingFinished] = useState(false);
   const [wakeEnabled, setWakeEnabled] = useState(true);
   const [toast, setToast] = useState("");
+  const voiceModel = useVoiceModel();
 
   const onAddRound = useCallback((scores: Record<PlayerId, number>) => {
     if (game) addRound(game.id, scores, "voice");
@@ -301,6 +304,7 @@ export default function GamePage() {
               {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
             </div>}
             {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
+            <VoiceModelStatus status={voiceModel} />
           </section>
           <aside className="command-help" aria-label={messages.game.commandHelpTitle}>
             <strong>{messages.game.commandHelpTitle}</strong>
@@ -317,6 +321,7 @@ export default function GamePage() {
       {game.status === "active" && <div className="voice-dock">
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
+          disabled={voiceModel.phase !== "ready"}
           aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onPointerDown={(event) => {
             event.preventDefault();

@@ -237,52 +237,65 @@ export async function listenOnce(
   });
 }
 
-function startVolumeMeter(onVolume: (level: number) => void): () => void {
-  let cancelled = false;
-  let frame: number | undefined;
-  let stream: MediaStream | undefined;
-  let context: AudioContext | undefined;
-  let smoothed = 0;
+const volumeSubscribers = new Set<(level: number) => void>();
+let volumeStream: MediaStream | undefined;
+let volumeContext: AudioContext | undefined;
+let volumeStart: Promise<void> | undefined;
+let volumeFrame: number | undefined;
+let currentVolume = 0;
 
-  void navigator.mediaDevices?.getUserMedia({ audio: true }).then(async (mediaStream) => {
-    if (cancelled) {
-      mediaStream.getTracks().forEach((track) => track.stop());
-      return;
-    }
-    stream = mediaStream;
-    context = new AudioContext();
-    if (context.state === "suspended") await context.resume();
-    if (cancelled) {
-      mediaStream.getTracks().forEach((track) => track.stop());
-      if (context.state !== "closed") await context.close();
-      return;
-    }
-    const analyser = context.createAnalyser();
+function ensureVolumeMeter(): Promise<void> {
+  if (volumeStream?.active) {
+    return volumeContext?.state === "suspended" ? volumeContext.resume() : Promise.resolve();
+  }
+  if (volumeStart) return volumeStart;
+  if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve();
+
+  volumeStart = navigator.mediaDevices.getUserMedia({ audio: true }).then(async (stream) => {
+    volumeStream = stream;
+    stream.getTracks().forEach((track) => {
+      track.onended = () => {
+        if (volumeFrame !== undefined) cancelAnimationFrame(volumeFrame);
+        volumeFrame = undefined;
+        volumeStream = undefined;
+        volumeStart = undefined;
+        currentVolume = 0;
+        volumeSubscribers.forEach((subscriber) => subscriber(0));
+        if (volumeContext && volumeContext.state !== "closed") void volumeContext.close();
+        volumeContext = undefined;
+      };
+    });
+    volumeContext = new AudioContext();
+    if (volumeContext.state === "suspended") await volumeContext.resume();
+    const analyser = volumeContext.createAnalyser();
     analyser.fftSize = 256;
-    context.createMediaStreamSource(mediaStream).connect(analyser);
+    volumeContext.createMediaStreamSource(stream).connect(analyser);
     const samples = new Float32Array(analyser.fftSize);
 
     const measure = () => {
       analyser.getFloatTimeDomainData(samples);
       const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
       const normalized = Math.min(1, Math.max(0, (rms - 0.008) / 0.16));
-      smoothed = Math.max(normalized, smoothed * 0.72);
-      onVolume(smoothed);
-      frame = requestAnimationFrame(measure);
+      currentVolume = Math.max(normalized, currentVolume * 0.72);
+      volumeSubscribers.forEach((subscriber) => subscriber(currentVolume));
+      volumeFrame = requestAnimationFrame(measure);
     };
     measure();
   }).catch(() => {
-    // The speech session remains usable when raw microphone analysis is unavailable.
-    stream?.getTracks().forEach((track) => track.stop());
-    if (context && context.state !== "closed") void context.close();
-    onVolume(0);
+    volumeStart = undefined;
+    volumeSubscribers.forEach((subscriber) => subscriber(0));
   });
+  return volumeStart;
+}
+
+function startVolumeMeter(onVolume: (level: number) => void): () => void {
+  volumeSubscribers.add(onVolume);
+  onVolume(currentVolume);
+  void ensureVolumeMeter();
 
   return () => {
-    cancelled = true;
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    stream?.getTracks().forEach((track) => track.stop());
-    if (context && context.state !== "closed") void context.close();
+    volumeSubscribers.delete(onVolume);
+    onVolume(0);
   };
 }
 

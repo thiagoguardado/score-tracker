@@ -9,7 +9,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
+    { name: "mobile-chromium", use: { ...devices["Pixel 7"], hasTouch: false } },
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {

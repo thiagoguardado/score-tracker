@@ -28,6 +28,7 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByLabel("Mario", { exact: true })).toHaveAttribute("inputmode", "numeric");
   await page.getByLabel("Mario", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Toggle sign for Mario's score" }).click();
+  await expect(page.getByLabel("Mario", { exact: true })).toHaveValue("-7"); // wait for re-render to settle
   await page.getByRole("button", { name: "Confirm round" }).click();
 
   await expect(page.getByText("10", { exact: true })).toBeVisible();

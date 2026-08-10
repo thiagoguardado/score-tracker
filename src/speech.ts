@@ -183,12 +183,12 @@ export async function listenOnce(
 
     activeRecognition = { recognition, cancel, released };
     armTimeout(timeoutMs);
+    if (onVolume) stopVolumeMeter = startVolumeMeter(onVolume);
 
     recognition.onstart = () => armTimeout(timeoutMs);
     recognition.onaudiostart = () => {
       armTimeout(timeoutMs);
       onCaptureStart?.();
-      if (onVolume) stopVolumeMeter = startVolumeMeter(onVolume);
     };
     recognition.onsoundstart = () => armTimeout(MAX_UTTERANCE_MS);
     recognition.onspeechstart = () => armTimeout(MAX_UTTERANCE_MS);

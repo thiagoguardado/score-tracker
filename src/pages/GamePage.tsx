@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
-import { useWakeLock } from "../hooks/useWakeLock";
 import { useI18n, type Locale, type Messages } from "../i18n";
 import { useVoiceModel } from "../localTranscription";
 import { useAppStore } from "../store";
@@ -213,7 +212,6 @@ export default function GamePage() {
   const [panel, setPanel] = useState<Panel>("ranking");
   const [manualOpen, setManualOpen] = useState(false);
   const [editingFinished, setEditingFinished] = useState(false);
-  const [wakeEnabled, setWakeEnabled] = useState(true);
   const [toast, setToast] = useState("");
   const voiceModel = useVoiceModel();
 
@@ -229,7 +227,6 @@ export default function GamePage() {
 
   const emptyGame: Game = { id: "", startedAt: "", status: "active", players: [], rounds: [] };
   const voice = useVoiceConversation({ game: game ?? emptyGame, locale, onAddRound, onDeleteRound, onFinish });
-  const wake = useWakeLock(Boolean(game && game.status === "active" && wakeEnabled));
   const ranking = useMemo(() => game ? rankingFor(game, game.rounds, locale) : [], [game, locale]);
 
   useEffect(() => {
@@ -271,13 +268,7 @@ export default function GamePage() {
       <header className="game-topbar">
         <button className="text-action" onClick={() => navigate("/")}>{messages.common.home}</button>
         <div className="game-title"><small>{game.status === "active" ? messages.game.active : messages.game.finalResult}</small><strong>{formatGameDate(game.startedAt, locale)}</strong></div>
-        <div className="game-topbar-actions">
-          {game.status === "active" && (
-            <button className={`wake-button ${wake.active ? "active" : ""}`} aria-label={wakeEnabled ? messages.game.keepScreenAwakeOff : messages.game.keepScreenAwakeOn} onClick={() => setWakeEnabled((value) => !value)}>
-              {wakeEnabled ? messages.game.screenOn : messages.game.screenOff}
-            </button>
-          )}
-        </div>
+        <div className="game-topbar-actions" aria-hidden="true" />
       </header>
 
       <section className="scoreboard-shell">
@@ -333,14 +324,12 @@ export default function GamePage() {
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
-            void wake.request();
             voice.activate();
           }}
           onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
           onPointerCancel={voice.cancel}
           onKeyDown={(event) => {
             if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
-              void wake.request();
               voice.activate();
             }
           }}
@@ -350,11 +339,13 @@ export default function GamePage() {
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
         </button>
         <div className="voice-dock-copy">
-          {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
+          <div className="voice-dock-meta">
+            {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
+            <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
+          </div>
           <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
-          <VoiceModelStatus status={voiceModel} compact />
+          {voiceModel.phase !== "ready" && voiceModel.phase !== "transcribing" && <VoiceModelStatus status={voiceModel} compact />}
         </div>
-        <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
       </div>}
 
       {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}

@@ -38,6 +38,7 @@ type ActiveUtterance = {
   startedAt: number;
   maxRms: number;
   partialInFlight: boolean;
+  partialRequested: boolean;
   partialTimer?: number;
   timeout?: number;
   watchdog?: number;
@@ -77,6 +78,27 @@ function mergeChunks(chunks: Float32Array[], sampleCount: number): Float32Array 
     offset += chunk.length;
   }
   return merged;
+}
+
+function trimSilence(audio: Float32Array, sampleRate: number): Float32Array {
+  if (audio.length < sampleRate * 0.25) return audio;
+  let peak = 0;
+  for (const sample of audio) peak = Math.max(peak, Math.abs(sample));
+  const threshold = Math.max(0.004, peak * 0.08);
+  const frameSize = Math.max(1, Math.floor(sampleRate * 0.02));
+  let first = 0;
+  let last = audio.length;
+  for (let offset = 0; offset < audio.length; offset += frameSize) {
+    let framePeak = 0;
+    for (let index = offset; index < Math.min(audio.length, offset + frameSize); index += 1) framePeak = Math.max(framePeak, Math.abs(audio[index]));
+    if (framePeak >= threshold) { first = Math.max(0, offset - sampleRate * 0.18); break; }
+  }
+  for (let offset = audio.length - frameSize; offset >= 0; offset -= frameSize) {
+    let framePeak = 0;
+    for (let index = Math.max(0, offset); index < Math.min(audio.length, offset + frameSize); index += 1) framePeak = Math.max(framePeak, Math.abs(audio[index]));
+    if (framePeak >= threshold) { last = Math.min(audio.length, offset + frameSize + sampleRate * 0.18); break; }
+  }
+  return first === 0 && last === audio.length ? audio : audio.slice(first, last);
 }
 
 export class AudioWorkletCapture {
@@ -306,9 +328,10 @@ export class AudioWorkletCapture {
   }
 
   private schedulePartial(utterance: ActiveUtterance): void {
-    utterance.partialTimer = window.setInterval(() => {
-      if (utterance.settled || utterance.partialInFlight || !utterance.onInterim) return;
+    utterance.partialTimer = window.setTimeout(() => {
+      if (utterance.settled || utterance.partialInFlight || utterance.partialRequested || !utterance.onInterim) return;
       if (utterance.sampleCount < this.sampleRate * MIN_PARTIAL_SECONDS || utterance.maxRms < SILENCE_RMS) return;
+      utterance.partialRequested = true;
       utterance.partialInFlight = true;
       const snapshot = mergeChunks(utterance.chunks, utterance.sampleCount);
       void this.engine.transcribe({ audio: snapshot, sampleRate: this.sampleRate, locale: utterance.locale, kind: "partial" })
@@ -334,7 +357,7 @@ export class AudioWorkletCapture {
 
   private clearUtteranceTimers(utterance: ActiveUtterance): void {
     window.clearTimeout(utterance.timeout);
-    window.clearInterval(utterance.partialTimer);
+    window.clearTimeout(utterance.partialTimer);
     window.clearInterval(utterance.watchdog);
   }
 
@@ -358,7 +381,7 @@ export class AudioWorkletCapture {
     }
 
     try {
-      const audio = mergeChunks(utterance.chunks, utterance.sampleCount);
+      const audio = trimSilence(mergeChunks(utterance.chunks, utterance.sampleCount), this.sampleRate);
       const startedAt = performance.now();
       const text = await this.engine.transcribe({ audio, sampleRate: this.sampleRate, locale: utterance.locale, kind: "final" });
       if (utterance.settled) return;
@@ -389,7 +412,7 @@ export class AudioWorkletCapture {
     return new Promise((resolve, reject) => {
       const utterance: ActiveUtterance = {
         id: this.nextCaptureId++, locale, chunks: [], sampleCount: 0, startedAt: performance.now(), maxRms: 0,
-        partialInFlight: false, onCaptureStart, onVolume, onInterim, resolve, reject, finishRequested: false, gateOpened: false, settled: false,
+        partialInFlight: false, partialRequested: false, onCaptureStart, onVolume, onInterim, resolve, reject, finishRequested: false, gateOpened: false, settled: false,
       };
       this.active = utterance;
 

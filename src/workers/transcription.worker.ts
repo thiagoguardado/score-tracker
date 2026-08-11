@@ -3,7 +3,10 @@
 import { env, ModelRegistry, pipeline } from "@huggingface/transformers";
 import { resamplePcm } from "../voice/resample";
 
-const MODEL_ID = "onnx-community/whisper-tiny";
+// Base is a modestly larger multilingual model but is substantially more
+// reliable for names and numbers than tiny. With q8 weights it remains a
+// practical offline download for phones.
+const MODEL_ID = "onnx-community/whisper-base";
 const MODEL_DTYPE = "q8" as const;
 env.useBrowserCache = true;
 env.useWasmCache = true;
@@ -96,6 +99,7 @@ self.addEventListener("message", async (event: MessageEvent<Request>) => {
       const output = await transcriber(audio, {
         language: request.language === "pt" ? "portuguese" : "english",
         task: "transcribe",
+        condition_on_prev_tokens: false,
       });
       const text = Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text;
       self.postMessage({ type: "result", id: request.id, kind: request.kind, text: text.trim() });

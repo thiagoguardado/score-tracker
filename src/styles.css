@@ -206,12 +206,10 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .game-title small, .game-title strong { display: block; }
 .game-title small { color: var(--muted); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .game-title strong { margin-top: 4px; font-size: 0.86rem; }
-.wake-button { min-height: 40px; padding: 0 12px; border: 0; border-radius: var(--radius-pill); color: var(--muted); background: var(--soft); font-size: 0.67rem; font-weight: 800; cursor: pointer; }
-.wake-button.active { color: var(--inverse-ink); background: var(--inverse); }
 
 .scoreboard-shell {
   min-height: calc(100vh - 82px - env(safe-area-inset-top));
-  padding: 26px max(20px, env(safe-area-inset-right)) calc(150px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: 26px max(20px, env(safe-area-inset-right)) calc(116px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   border-radius: 0;
   color: var(--ink);
   background: var(--background);
@@ -221,26 +219,26 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .scoreboard-heading h1 { margin: 0; font-size: clamp(3rem, 12vw, 5rem); font-weight: 850; line-height: 0.92; }
 
 .ranking-list { display: grid; gap: 2px; }
-.ranking-row { display: grid; min-height: 78px; grid-template-columns: 62px 1fr auto; align-items: center; gap: 12px; padding: 14px 6px; border: 0; background: transparent; box-shadow: inset 0 -1px var(--line); }
-.ranking-row.place-1 { min-height: 112px; margin-bottom: 8px; padding: 20px 22px; border: 0; border-radius: var(--radius-large); background: var(--soft); box-shadow: none; }
+.ranking-row { display: grid; min-height: 66px; grid-template-columns: 58px 1fr auto; align-items: center; gap: 12px; padding: 10px 6px; border: 0; background: transparent; box-shadow: inset 0 -1px var(--line); }
+.ranking-row.place-1 { min-height: 92px; margin-bottom: 6px; padding: 16px 18px; border: 0; border-radius: var(--radius-large); background: var(--soft); box-shadow: none; }
 .rank-position { color: var(--muted); font-size: 0.86rem; font-weight: 800; }
 .place-1 .rank-position { color: var(--ink); font-size: 0.9rem; font-weight: 900; }
 .rank-name { min-width: 0; }
 .rank-name strong, .rank-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rank-name strong { font-size: 1.05rem; font-weight: 800; }
-.place-1 .rank-name strong { font-size: 1.42rem; font-weight: 900; }
+.rank-name strong { font-size: 1rem; font-weight: 800; }
+.place-1 .rank-name strong { font-size: 1.28rem; font-weight: 900; }
 .rank-name small { margin-top: 4px; color: var(--muted); font-size: 0.68rem; font-weight: 800; text-transform: uppercase; }
-.rank-score { padding-left: 8px; font-size: clamp(1.85rem, 8vw, 2.7rem); font-variant-numeric: tabular-nums; font-weight: 900; letter-spacing: -0.06em; }
-.place-1 .rank-score { font-size: clamp(2.45rem, 11vw, 3.8rem); }
+.rank-score { padding-left: 8px; font-size: clamp(1.7rem, 7vw, 2.35rem); font-variant-numeric: tabular-nums; font-weight: 900; letter-spacing: -0.06em; }
+.place-1 .rank-score { font-size: clamp(2.2rem, 10vw, 3.2rem); }
 .leader-emoji { margin-right: 5px; font-size: 0.92rem; }
 
-.voice-card { margin-top: 24px; padding: 20px 22px; border: 0; border-radius: var(--radius-medium); background: var(--soft); }
+.voice-card { margin-top: 18px; padding: 16px 18px; border: 0; border-radius: var(--radius-medium); background: var(--soft); }
 .voice-card.phase-starting, .voice-card.phase-listening, .voice-card.phase-awaiting-decision { box-shadow: inset 4px 0 var(--ink); }
 .voice-card.phase-error { padding: 20px 22px; box-shadow: inset 4px 0 var(--ink); }
 .voice-status-line { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.voice-card p { margin: 8px 0 0; color: var(--muted); font-size: 0.83rem; line-height: 1.45; }
-.voice-card blockquote { margin: 12px 0 0; font-size: 0.92rem; font-weight: 800; }
-.voice-confirm { width: 100%; margin-top: 16px; padding: 14px 18px; border: 0; border-radius: var(--radius-pill); color: var(--inverse-ink); background: var(--inverse); font: inherit; font-weight: 900; cursor: pointer; }
+.voice-card p { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.voice-card blockquote { margin: 8px 0 0; font-size: 0.88rem; font-weight: 800; }
+.voice-confirm { width: 100%; margin-top: 12px; padding: 12px 18px; border: 0; border-radius: var(--radius-pill); color: var(--inverse-ink); background: var(--inverse); font: inherit; font-weight: 900; cursor: pointer; }
 .voice-model-status { margin-top: 14px; color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
 .voice-model-status > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .voice-model-status strong, .voice-model-status small { display: block; }
@@ -255,16 +253,18 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .draft-score-chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
 .draft-score-chips span { font-size: 0.76rem; }
 .draft-score-chips strong { margin-left: 4px; font-size: 1rem; }
-.voice-dock { position: fixed; z-index: 20; right: 14px; bottom: calc(12px + env(safe-area-inset-bottom)); left: 14px; display: grid; max-width: 650px; min-height: 86px; grid-template-columns: minmax(126px, 172px) 1fr auto; align-items: center; gap: 14px; margin: auto; padding: 12px 14px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); }
+.voice-dock { position: fixed; z-index: 20; right: 14px; bottom: calc(12px + env(safe-area-inset-bottom)); left: 14px; display: grid; max-width: 680px; min-height: 80px; grid-template-columns: minmax(136px, 190px) minmax(0, 1fr); align-items: center; gap: 12px; margin: auto; padding: 10px 12px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); }
 .setup-voice-dock { grid-template-columns: minmax(144px, 190px) 1fr; }
 .voice-dock strong, .voice-dock small { display: block; }
 .voice-dock strong { font-size: 0.9rem; font-weight: 900; }
-.voice-dock small { margin-top: 4px; color: currentColor; font-size: 0.68rem; opacity: 0.68; }
-.voice-dock-copy { min-width: 0; }
+.voice-dock small { margin-top: 3px; color: currentColor; font-size: 0.68rem; line-height: 1.25; opacity: 0.68; }
+.voice-dock-copy { display: grid; min-width: 0; align-content: center; }
+.voice-dock-meta { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
+.voice-dock-meta strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main-mic { width: 100%; min-height: 60px; padding: 0 17px; border: 0; border-radius: var(--radius-pill); color: var(--ink); background: var(--background); font-size: 0.76rem; font-weight: 900; cursor: pointer; }
 .main-mic.active { color: var(--inverse-ink); background: var(--inverse); box-shadow: inset 0 0 0 2px var(--inverse-ink); }
-.manual-link { min-height: 44px; padding: 0 6px; border: 0; color: currentColor; background: transparent; font-size: 0.72rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-.voice-dock .voice-model-status { margin-top: 5px; color: currentColor; font-size: 0.62rem; }
+.manual-link { flex: 0 0 auto; min-height: 32px; padding: 0 2px; border: 0; color: currentColor; background: transparent; font-size: 0.68rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.voice-dock .voice-model-status { margin-top: 4px; color: currentColor; font-size: 0.62rem; }
 .voice-dock .voice-model-status.ready { opacity: 0.62; }
 .voice-dock .voice-model-status .secondary-button { min-height: 38px; padding: 0 14px; color: var(--ink); background: var(--background); font-size: 0.7rem; }
 .voice-dock .voice-model-status progress { height: 4px; margin: 5px 0 0; background: rgb(127 127 127 / 35%); accent-color: currentColor; }
@@ -332,7 +332,8 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
   .ranking-row.place-1 { grid-template-columns: 54px 1fr auto; padding: 18px; }
   .voice-dock { gap: 9px; }
   .voice-dock > div { min-width: 0; }
-  .voice-dock strong, .voice-dock small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .voice-dock strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .voice-dock small { overflow: visible; white-space: normal; }
   .main-mic { padding: 0 10px; }
 }
 

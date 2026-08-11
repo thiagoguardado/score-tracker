@@ -42,7 +42,7 @@ const englishMessages = {
     transcribing: "Transcribing on this device…",
     error: "The offline voice model could not be loaded.",
     retry: "Try download again",
-    size: "One download for English and Portuguese (about 70 MB).",
+    size: "One download for English and Portuguese (about 80 MB).",
   },
   home: {
     tagline: "Your game-night scoreboard",
@@ -223,7 +223,7 @@ const portugueseMessages: Messages = {
     transcribing: "Transcrevendo neste aparelho…",
     error: "Não foi possível carregar o modelo de voz offline.",
     retry: "Tentar baixar novamente",
-    size: "Um único download para inglês e português (cerca de 70 MB).",
+    size: "Um único download para inglês e português (cerca de 80 MB).",
   },
   home: {
     tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores por voz", savedOnDevice: "Salvo neste aparelho", history: "Histórico",

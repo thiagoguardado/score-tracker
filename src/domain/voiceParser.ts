@@ -59,8 +59,76 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+const RESERVED_NAME_TOKENS: Record<Locale, Set<string>> = {
+  en: new Set([
+    "and", "at", "cancel", "change", "confirm", "correct", "finish", "game", "is", "last",
+    "minus", "negative", "point", "points", "ranking", "read", "repeat", "round", "save", "score",
+    "scoreboard", "set", "standings", "to", "undo", "who", "winning", "with",
+  ]),
+  "pt-BR": new Set([
+    "cancelar", "com", "confirmar", "corrigir", "desfazer", "e", "eh", "encerrar", "finalizar",
+    "fica", "ganhando", "jogo", "menos", "negativo", "para", "placar", "ponto", "pontos", "quem",
+    "ranking", "repetir", "rodada", "salvar", "terminar", "ultima",
+  ]),
+};
+
+function editDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[right.length];
+}
+
+function scoreFollows(tokens: string[], nameIndex: number, locale: Locale): boolean {
+  for (let length = 1; length <= 4 && nameIndex + length < tokens.length; length += 1) {
+    if (parseLocalizedNumber(tokens.slice(nameIndex + 1, nameIndex + length + 1).join(" "), locale) !== null) return true;
+  }
+  return false;
+}
+
+/**
+ * Whisper often returns a plausible spelling for a proper name. Correct only
+ * a single word that is immediately associated with a score and has one clear
+ * close match among the players. Ambiguous words are deliberately untouched.
+ */
+function canonicalizePlayerNames(transcript: string, players: Player[], locale: Locale): string {
+  const tokens = normalizeSpeech(transcript).split(" ").filter(Boolean);
+  const names = players
+    .map((player) => ({ player, normalized: normalizeSpeech(player.name) }))
+    .filter(({ normalized }) => normalized.length >= 3 && !normalized.includes(" "));
+
+  return tokens.map((token, index) => {
+    if (names.some(({ normalized }) => normalized === token)) return token;
+    if (token.length < 3 || RESERVED_NAME_TOKENS[locale].has(token) || parseLocalizedNumber(token, locale) !== null) return token;
+    if (!scoreFollows(tokens, index, locale)) return token;
+
+    const ranked = names
+      .map(({ normalized }) => {
+        const distance = editDistance(token, normalized);
+        return { normalized, distance, similarity: 1 - distance / Math.max(token.length, normalized.length) };
+      })
+      .sort((left, right) => left.distance - right.distance || right.similarity - left.similarity);
+    const best = ranked[0];
+    if (!best) return token;
+    const distanceLimit = Math.max(token.length, best.normalized.length) <= 4 ? 1 : 2;
+    if (best.distance > distanceLimit || best.similarity < 0.67) return token;
+    const second = ranked[1];
+    if (second && (second.distance === best.distance || second.similarity >= best.similarity - 0.12)) return token;
+    return best.normalized;
+  }).join(" ");
+}
+
 function correctionFrom(transcript: string, players: Player[], locale: Locale): GameVoiceCommand | null {
-  const normalized = ` ${normalizeSpeech(transcript)} `;
+  const normalized = ` ${canonicalizePlayerNames(transcript, players, locale)} `;
   const lexicon = LEXICONS[locale];
   for (const player of players) {
     const name = normalizeSpeech(player.name);
@@ -76,7 +144,7 @@ function correctionFrom(transcript: string, players: Player[], locale: Locale): 
 }
 
 function roundFrom(transcript: string, players: Player[], locale: Locale): GameVoiceCommand | null {
-  const normalized = normalizeSpeech(transcript);
+  const normalized = canonicalizePlayerNames(transcript, players, locale);
   const messages = getMessages(locale);
   const occurrences = players
     .map((player) => {

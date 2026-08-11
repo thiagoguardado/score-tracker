@@ -28,6 +28,19 @@ describe("parseGameVoiceCommand", () => {
     });
   });
 
+  it("repairs clear Whisper spelling errors for known player names", () => {
+    expect(parseGameVoiceCommand("Tiago zero, Marimo cinco", players, false, "pt-BR")).toMatchObject({
+      type: "draft-round",
+      scores: { thiago: 0, mario: 5 },
+    });
+  });
+
+  it("does not guess an unrelated word as a player name", () => {
+    const command = parseGameVoiceCommand("Tchau zero, Marimo cinco", players, false, "pt-BR");
+    expect(command).toMatchObject({ type: "draft-round", scores: { thiago: 0, mario: 5 } });
+    if (command.type === "draft-round") expect(command.omitted.map((player) => player.id)).toContain("thiago");
+  });
+
   it("corrects an English pending score", () => {
     expect(parseGameVoiceCommand("Correct Mário to minus twelve", players, true, "en")).toEqual({
       type: "correct-score", playerId: "mario", score: -12,
@@ -37,6 +50,12 @@ describe("parseGameVoiceCommand", () => {
   it("corrects a Portuguese pending score", () => {
     expect(parseGameVoiceCommand("Corrigir Mário para menos doze", players, true, "pt-BR")).toEqual({
       type: "correct-score", playerId: "mario", score: -12,
+    });
+  });
+
+  it("repairs a known player name in a Portuguese correction", () => {
+    expect(parseGameVoiceCommand("Corrigir Marimo para doze", players, true, "pt-BR")).toEqual({
+      type: "correct-score", playerId: "mario", score: 12,
     });
   });
 

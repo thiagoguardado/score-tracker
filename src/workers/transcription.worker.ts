@@ -119,9 +119,7 @@ self.addEventListener("message", async (event: MessageEvent<Request>) => {
     }
 
     const request = event.data;
-    // A final transcription is the only result that can change the game. Put
-    // it ahead of queued, optional previews without dropping those previews
-    // (their promises still need a result so they can settle cleanly).
+    // Final results take priority over any optional request already queued.
     if (request.kind === "final") inferenceQueue.unshift(request);
     else inferenceQueue.push(request);
     void drainInferenceQueue();
@@ -147,13 +145,12 @@ async function drainInferenceQueue(): Promise<void> {
           language: request.language === "pt" ? "portuguese" : "english",
           task: "transcribe",
           condition_on_prev_tokens: false,
-          // Keep the live preview cheap, but give the final command a small
-          // beam-search budget so names and short Portuguese phrases are less
-          // likely to collapse into phonetic guesses.
-          num_beams: request.kind === "final" ? 3 : 1,
+          // Commands are short and already constrained by player-name context.
+          // Greedy decoding avoids multiplying mobile WASM work by three.
+          num_beams: 1,
           do_sample: false,
           return_timestamps: false,
-          max_new_tokens: 64,
+          max_new_tokens: request.kind === "final" ? 48 : 32,
           prompt_ids: promptIdsFor(transcriber, request.preferredPhrases ?? [], request.language),
         });
         const text = Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text;

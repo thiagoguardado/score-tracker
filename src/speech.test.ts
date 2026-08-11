@@ -188,8 +188,8 @@ describe("AudioWorklet speech capture", () => {
     expect(transcribeLocally).not.toHaveBeenCalled();
   }, 3_000);
 
-  it("publishes a live partial transcript before the final result", async () => {
-    vi.mocked(transcribeLocally).mockResolvedValueOnce("Mario").mockResolvedValueOnce("Mario five");
+  it("waits until release before transcribing", async () => {
+    vi.mocked(transcribeLocally).mockResolvedValue("Mario five");
     const onInterim = vi.fn();
     const onCaptureStart = vi.fn();
     const result = listenOnce("en", 10_000, [], onCaptureStart, undefined, onInterim);
@@ -197,10 +197,13 @@ describe("AudioWorklet speech capture", () => {
     const port = FakeAudioWorkletNode.instances.at(-1)!.port;
     port.emitAudio(new Float32Array(60_000).fill(0.05));
     const healthTimer = window.setInterval(() => port.emitHealth(), 200);
-    await vi.waitFor(() => expect(onInterim).toHaveBeenCalledWith("Mario"), { timeout: 2_500 });
+    await new Promise((resolve) => window.setTimeout(resolve, 2_500));
     window.clearInterval(healthTimer);
+    expect(onInterim).not.toHaveBeenCalled();
+    expect(transcribeLocally).not.toHaveBeenCalled();
     finishListening();
     await expect(result).resolves.toBe("Mario five");
+    expect(transcribeLocally).toHaveBeenCalledTimes(1);
   });
 
   it("preserves a microphone acquisition failure", async () => {

@@ -5,12 +5,6 @@ import type { SpeechEngine } from "./SpeechEngine";
 const FRAME_STALL_MS = 1_200;
 const NO_VOICE_MS = 3_000;
 const SILENCE_RMS = 0.0025;
-// Keep the optional live preview out of the way of the normal short
-// push-to-talk utterance. A final result must start immediately when the
-// user releases the button; on mobile, starting Whisper before that release
-// can otherwise leave the final request waiting behind the preview.
-const PARTIAL_INTERVAL_MS = 2_400;
-const MIN_PARTIAL_SECONDS = 1.1;
 const LOG_KEY = "score-tracker:voice-log:v1";
 
 export type CapturePhase = "disconnected" | "connecting" | "ready" | "listening" | "interrupted";
@@ -42,14 +36,10 @@ type ActiveUtterance = {
   sampleCount: number;
   startedAt: number;
   maxRms: number;
-  partialInFlight: boolean;
-  partialRequested: boolean;
-  partialTimer?: number;
   timeout?: number;
   watchdog?: number;
   onCaptureStart?: () => void;
   onVolume?: (level: number) => void;
-  onInterim?: (text: string) => void;
   resolve: (text: string) => void;
   reject: (error: Error) => void;
   finishRequested: boolean;
@@ -332,20 +322,6 @@ export class AudioWorkletCapture {
     }
   }
 
-  private schedulePartial(utterance: ActiveUtterance): void {
-    utterance.partialTimer = window.setTimeout(() => {
-      if (utterance.settled || utterance.partialInFlight || utterance.partialRequested || !utterance.onInterim) return;
-      if (utterance.sampleCount < this.sampleRate * MIN_PARTIAL_SECONDS || utterance.maxRms < SILENCE_RMS) return;
-      utterance.partialRequested = true;
-      utterance.partialInFlight = true;
-      const snapshot = mergeChunks(utterance.chunks, utterance.sampleCount);
-      void this.engine.transcribe({ audio: snapshot, sampleRate: this.sampleRate, locale: utterance.locale, kind: "partial", preferredPhrases: utterance.preferredPhrases })
-        .then((text) => { if (!utterance.settled && text.trim()) utterance.onInterim?.(text.trim()); })
-        .catch((error) => this.log("partial-transcription-failed", { error: error instanceof Error ? error.message : String(error) }))
-        .finally(() => { utterance.partialInFlight = false; });
-    }, PARTIAL_INTERVAL_MS);
-  }
-
   private startWatchdog(utterance: ActiveUtterance): void {
     utterance.watchdog = window.setInterval(() => {
       if (utterance.settled) return;
@@ -362,7 +338,6 @@ export class AudioWorkletCapture {
 
   private clearUtteranceTimers(utterance: ActiveUtterance): void {
     window.clearTimeout(utterance.timeout);
-    window.clearTimeout(utterance.partialTimer);
     window.clearInterval(utterance.watchdog);
   }
 
@@ -407,7 +382,7 @@ export class AudioWorkletCapture {
     preferredPhrases: string[] = [],
     onCaptureStart?: () => void,
     onVolume?: (level: number) => void,
-    onInterim?: (text: string) => void,
+    _onInterim?: (text: string) => void,
   ): Promise<string> {
     if (this.active) {
       const previous = this.active;
@@ -418,7 +393,7 @@ export class AudioWorkletCapture {
     return new Promise((resolve, reject) => {
       const utterance: ActiveUtterance = {
         id: this.nextCaptureId++, locale, preferredPhrases, chunks: [], sampleCount: 0, startedAt: performance.now(), maxRms: 0,
-        partialInFlight: false, partialRequested: false, onCaptureStart, onVolume, onInterim, resolve, reject, finishRequested: false, gateOpened: false, settled: false,
+        onCaptureStart, onVolume, resolve, reject, finishRequested: false, gateOpened: false, settled: false,
       };
       this.active = utterance;
 
@@ -429,7 +404,6 @@ export class AudioWorkletCapture {
         this.node?.port.postMessage({ type: "gate", open: true, captureId: utterance.id });
         this.updateDeviceHealth({ phase: "listening", problem: undefined, rms: 0 });
         utterance.onCaptureStart?.();
-        this.schedulePartial(utterance);
         this.startWatchdog(utterance);
         utterance.timeout = window.setTimeout(() => this.finish(), timeoutMs);
         this.log("ptt-open", { captureId: utterance.id });

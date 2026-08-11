@@ -7,6 +7,7 @@ export type TranscriptionRequest = {
   sampleRate: number;
   locale: Locale;
   kind: TranscriptionKind;
+  preferredPhrases?: string[];
 };
 
 export interface SpeechEngine {

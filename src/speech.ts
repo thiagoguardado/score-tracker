@@ -67,7 +67,7 @@ export async function listenOnce(
   onVolume?: (level: number) => void,
   onInterimTranscript?: (text: string) => void,
 ): Promise<string> {
-  return capture.listen(locale, timeoutMs, onCaptureStart, onVolume, onInterimTranscript);
+  return capture.listen(locale, timeoutMs, _preferredPhrases, onCaptureStart, onVolume, onInterimTranscript);
 }
 
 export function speak(text: string, locale: Locale): Promise<void> {

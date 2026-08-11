@@ -15,7 +15,7 @@ type Device = "webgpu" | "wasm";
 type Request =
   | { type: "check-cache" }
   | { type: "load"; preferWebGpu: boolean }
-  | { type: "transcribe"; id: number; audio: Float32Array; sampleRate: number; language: "en" | "pt"; kind: "partial" | "final" };
+  | { type: "transcribe"; id: number; audio: Float32Array; sampleRate: number; language: "en" | "pt"; kind: "partial" | "final"; preferredPhrases?: string[] };
 
 let transcriberPromise: ReturnType<typeof createPreferredTranscriber> | undefined;
 type QueuedRequest = Extract<Request, { type: "transcribe" }>;
@@ -24,6 +24,30 @@ let inferenceRunning = false;
 let activeDevice: Device = "wasm";
 let readyAnnounced = false;
 let preferWebGpu = false;
+
+type WhisperTokenizer = (text: string, options?: { add_special_tokens?: boolean }) => {
+  input_ids?: { tolist?: () => number[][] } | number[][];
+};
+
+type WhisperPipeline = ((audio: Float32Array, options: Record<string, unknown>) => Promise<{ text: string } | Array<{ text: string }>>) & {
+  tokenizer?: WhisperTokenizer;
+};
+
+function promptIdsFor(transcriber: WhisperPipeline, phrases: string[], language: "en" | "pt"): number[] | undefined {
+  if (phrases.length === 0 || !transcriber.tokenizer) return undefined;
+  const prompt = language === "pt"
+    ? `Os nomes dos jogadores são: ${phrases.join(", ")}.`
+    : `The player names are: ${phrases.join(", ")}.`;
+  try {
+    const encoded = transcriber.tokenizer(prompt, { add_special_tokens: false });
+    const ids = encoded.input_ids;
+    if (!ids) return undefined;
+    const values = Array.isArray(ids) ? ids[0] : ids.tolist?.()?.[0];
+    return Array.isArray(values) ? values.map(Number) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 async function createTranscriber(device: Device) {
   activeDevice = device;
@@ -117,18 +141,20 @@ async function drainInferenceQueue(): Promise<void> {
     while (inferenceQueue.length > 0) {
       const request = inferenceQueue.shift()!;
       try {
-        const transcriber = await getTranscriber();
+        const transcriber = await getTranscriber() as WhisperPipeline;
         const audio = resamplePcm(request.audio, request.sampleRate);
         const output = await transcriber(audio, {
           language: request.language === "pt" ? "portuguese" : "english",
           task: "transcribe",
           condition_on_prev_tokens: false,
-          // The score parser needs short command phrases, not long-form
-          // decoding. Greedy decoding is materially quicker on mobile WASM.
-          num_beams: 1,
+          // Keep the live preview cheap, but give the final command a small
+          // beam-search budget so names and short Portuguese phrases are less
+          // likely to collapse into phonetic guesses.
+          num_beams: request.kind === "final" ? 3 : 1,
           do_sample: false,
           return_timestamps: false,
           max_new_tokens: 64,
+          prompt_ids: promptIdsFor(transcriber, request.preferredPhrases ?? [], request.language),
         });
         const text = Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text;
         self.postMessage({ type: "result", id: request.id, kind: request.kind, text: text.trim() });

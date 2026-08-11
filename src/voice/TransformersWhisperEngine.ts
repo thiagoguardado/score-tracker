@@ -6,7 +6,9 @@ export class TransformersWhisperEngine implements SpeechEngine {
     prepareVoiceModel();
   }
 
-  transcribe({ audio, sampleRate, locale, kind }: TranscriptionRequest): Promise<string> {
-    return transcribeLocally(audio, sampleRate, locale, kind);
+  transcribe({ audio, sampleRate, locale, kind, preferredPhrases }: TranscriptionRequest): Promise<string> {
+    return preferredPhrases?.length
+      ? transcribeLocally(audio, sampleRate, locale, kind, preferredPhrases)
+      : transcribeLocally(audio, sampleRate, locale, kind);
   }
 }

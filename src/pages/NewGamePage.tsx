@@ -117,7 +117,7 @@ export default function NewGamePage() {
           transcript = await listenOnce(
             locale,
             10_000,
-            [],
+            currentNames,
             () => setVoiceMessage(messages.setup.listening),
             setVolume,
             (partial) => setVoiceMessage(`“${partial}”`),

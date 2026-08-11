@@ -129,6 +129,17 @@ describe("AudioWorklet speech capture", () => {
     expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), 48_000, "pt-BR", "final");
   });
 
+  it("passes known player names as transcription context", async () => {
+    const onCaptureStart = vi.fn();
+    const result = listenOnce("pt-BR", 10_000, ["Thiago", "Mário"], onCaptureStart);
+    await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
+    const node = FakeAudioWorkletNode.instances.at(-1)!;
+    node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    finishListening();
+    await result;
+    expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), 48_000, "pt-BR", "final", ["Thiago", "Mário"]);
+  });
+
   it("keeps one microphone and AudioWorklet pipeline across consecutive presses", async () => {
     const first = await startCapture("en");
     first.node.port.emitAudio(new Float32Array(4_800).fill(0.05));

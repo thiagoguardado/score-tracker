@@ -157,6 +157,7 @@ export function transcribeLocally(
   sampleRate: number,
   locale: Locale,
   kind: TranscriptionKind = "final",
+  preferredPhrases: string[] = [],
 ): Promise<string> {
   const id = nextRequestId++;
   // Partial text is a visual hint only. Keep the model button usable while a
@@ -171,6 +172,7 @@ export function transcribeLocally(
       sampleRate,
       language: locale === "pt-BR" ? "pt" : "en",
       kind,
+      preferredPhrases,
     }, [audio.buffer]);
   });
 }

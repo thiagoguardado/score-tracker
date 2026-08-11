@@ -37,6 +37,7 @@ type WorkletMessage =
 type ActiveUtterance = {
   id: number;
   locale: Locale;
+  preferredPhrases: string[];
   chunks: Float32Array[];
   sampleCount: number;
   startedAt: number;
@@ -338,7 +339,7 @@ export class AudioWorkletCapture {
       utterance.partialRequested = true;
       utterance.partialInFlight = true;
       const snapshot = mergeChunks(utterance.chunks, utterance.sampleCount);
-      void this.engine.transcribe({ audio: snapshot, sampleRate: this.sampleRate, locale: utterance.locale, kind: "partial" })
+      void this.engine.transcribe({ audio: snapshot, sampleRate: this.sampleRate, locale: utterance.locale, kind: "partial", preferredPhrases: utterance.preferredPhrases })
         .then((text) => { if (!utterance.settled && text.trim()) utterance.onInterim?.(text.trim()); })
         .catch((error) => this.log("partial-transcription-failed", { error: error instanceof Error ? error.message : String(error) }))
         .finally(() => { utterance.partialInFlight = false; });
@@ -387,7 +388,7 @@ export class AudioWorkletCapture {
     try {
       const audio = trimSilence(mergeChunks(utterance.chunks, utterance.sampleCount), this.sampleRate);
       const startedAt = performance.now();
-      const text = await this.engine.transcribe({ audio, sampleRate: this.sampleRate, locale: utterance.locale, kind: "final" });
+      const text = await this.engine.transcribe({ audio, sampleRate: this.sampleRate, locale: utterance.locale, kind: "final", preferredPhrases: utterance.preferredPhrases });
       if (utterance.settled) return;
       utterance.settled = true;
       if (this.active?.id === utterance.id) this.active = undefined;
@@ -403,6 +404,7 @@ export class AudioWorkletCapture {
   async listen(
     locale: Locale,
     timeoutMs: number,
+    preferredPhrases: string[] = [],
     onCaptureStart?: () => void,
     onVolume?: (level: number) => void,
     onInterim?: (text: string) => void,
@@ -415,7 +417,7 @@ export class AudioWorkletCapture {
 
     return new Promise((resolve, reject) => {
       const utterance: ActiveUtterance = {
-        id: this.nextCaptureId++, locale, chunks: [], sampleCount: 0, startedAt: performance.now(), maxRms: 0,
+        id: this.nextCaptureId++, locale, preferredPhrases, chunks: [], sampleCount: 0, startedAt: performance.now(), maxRms: 0,
         partialInFlight: false, partialRequested: false, onCaptureStart, onVolume, onInterim, resolve, reject, finishRequested: false, gateOpened: false, settled: false,
       };
       this.active = utterance;

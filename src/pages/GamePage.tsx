@@ -350,8 +350,8 @@ export default function GamePage() {
           }}
           onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) voice.release(); }}
         >
-          <strong>{modelUsable ? "MIC" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
-          {modelUsable && <small>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</small>}
+          <strong aria-hidden="true">{modelUsable ? "🎤" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          <span className="sr-only">{modelUsable ? (voiceActive ? messages.game.stopVoice : messages.game.startVoice) : ""}</span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
           {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>

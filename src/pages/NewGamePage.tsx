@@ -227,9 +227,7 @@ export default function NewGamePage() {
 
       <div className="voice-dock setup-voice-dock">
         <div className="voice-dock-panel">
-          <div className="voice-dock-copy">
-            <small>{messages.setup.namesHint}</small>
-          </div>
+          <div className="voice-dock-copy" aria-hidden="true" />
         </div>
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
@@ -250,8 +248,8 @@ export default function NewGamePage() {
           onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) { if (modelUsable) void runVoiceSetup(); else prepareVoiceModel(); } }}
           onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
         >
-          <strong>{modelUsable ? "MIC" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
-          {modelUsable && <small>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</small>}
+          <strong aria-hidden="true">{modelUsable ? "🎤" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          <span className="sr-only">{modelUsable ? (voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers) : ""}</span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
           {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>

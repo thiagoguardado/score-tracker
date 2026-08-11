@@ -26,6 +26,7 @@
 * { box-sizing: border-box; }
 html { min-height: 100%; background: var(--background); }
 body { min-width: 320px; min-height: 100vh; margin: 0; color: var(--ink); background: var(--background); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 button, input, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
@@ -254,7 +255,8 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .draft-score-chips span { font-size: 0.76rem; }
 .draft-score-chips strong { margin-left: 4px; font-size: 1rem; }
 .voice-dock { position: fixed; z-index: 40; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); left: 12px; display: block; max-width: 680px; min-height: 112px; margin: auto; color: var(--inverse-ink); pointer-events: none; }
-.setup-voice-dock { grid-template-columns: minmax(144px, 190px) 1fr; }
+.setup-voice-dock { min-height: 82px; }
+.setup-voice-dock .voice-dock-panel { min-height: 82px; padding-top: 28px; }
 .voice-dock-panel { min-height: 112px; padding: 40px 16px 12px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); pointer-events: auto; }
 .voice-dock strong, .voice-dock small { display: block; }
 .voice-dock strong { font-size: 0.82rem; font-weight: 900; }
@@ -263,8 +265,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .voice-dock-copy > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-dock-actions { display: flex; min-height: 30px; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; }
 .main-mic { position: absolute; z-index: 2; top: -36px; left: 50%; display: grid; width: 96px; height: 96px; min-height: 96px; align-content: center; justify-items: center; padding: 0 10px; border: 0; border-radius: 50%; color: var(--ink); background: var(--background); font-size: 0.86rem; font-weight: 900; cursor: pointer; box-shadow: 0 8px 22px rgb(0 0 0 / 18%); transform: translateX(-50%); pointer-events: auto; }
-.main-mic strong { font-size: 1.05rem; line-height: 1; }
-.main-mic small { margin-top: 5px; color: currentColor; font-size: 0.58rem; line-height: 1; opacity: 0.64; }
+.main-mic strong { font-size: 2.05rem; line-height: 1; filter: grayscale(1); }
 .main-mic.active { color: var(--inverse-ink); background: var(--inverse); box-shadow: inset 0 0 0 2px var(--inverse-ink), 0 8px 22px rgb(0 0 0 / 24%); }
 .main-mic:disabled { cursor: wait; }
 .manual-link { flex: 0 0 auto; min-height: 30px; padding: 0 2px; border: 0; color: currentColor; background: transparent; font-size: 0.68rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }

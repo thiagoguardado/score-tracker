@@ -47,7 +47,7 @@ const englishMessages = {
   home: {
     tagline: "Your game-night scoreboard",
     newGame: "New game",
-    newGameSubtitle: "Add players by voice",
+    newGameSubtitle: "Set up players",
     savedOnDevice: "Saved on this device",
     history: "History",
     firstGame: "Your first game starts here",
@@ -226,7 +226,7 @@ const portugueseMessages: Messages = {
     size: "Um único download para inglês e português (cerca de 80 MB).",
   },
   home: {
-    tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores por voz", savedOnDevice: "Salvo neste aparelho", history: "Histórico",
+    tagline: "Seu placar de mesa", newGame: "Novo jogo", newGameSubtitle: "Cadastre os jogadores", savedOnDevice: "Salvo neste aparelho", history: "Histórico",
     firstGame: "Sua primeira partida começa aqui", emptyDescription: "Os jogos e todas as rodadas ficam salvos automaticamente neste aparelho.",
     storageError: "Não foi possível salvar neste aparelho. Verifique o espaço e as permissões do navegador.", inProgress: "Em andamento", finishedNoRounds: "Finalizado sem rodadas",
     winner: (name, total) => `${name} venceu com ${total}`,

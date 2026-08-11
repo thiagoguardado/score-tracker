@@ -9,7 +9,9 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "mobile-chromium", use: { ...devices["Pixel 7"], hasTouch: false } },
+    // Use a mobile viewport without isMobile/touch emulation. This keeps the
+    // responsive layout coverage deterministic on Linux CI and Windows.
+    { name: "mobile-chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 412, height: 915 } } },
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {

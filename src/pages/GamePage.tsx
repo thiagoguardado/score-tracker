@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
 import { useI18n, type Locale, type Messages } from "../i18n";
-import { useVoiceModel } from "../localTranscription";
+import { prepareVoiceModel, useVoiceModel } from "../localTranscription";
 import { useAppStore } from "../store";
 import { releaseMicrophoneCapture } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase } from "../types";
@@ -237,6 +236,7 @@ export default function GamePage() {
   const canEdit = game.status === "active" || editingFinished;
   const voiceActive = voice.status.phase === "starting" || voice.status.phase === "listening";
   const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
+  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing";
   const showVoiceCard = voice.status.phase !== "idle" || voice.confirmationPending;
 
   const share = async () => {
@@ -306,7 +306,6 @@ export default function GamePage() {
             {voice.status.draftScores && <div className="draft-score-chips">
               {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
             </div>}
-            {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
           </section>
         </>}
 
@@ -317,35 +316,44 @@ export default function GamePage() {
       </section>
 
       {game.status === "active" && <div className="voice-dock">
+        <div className="voice-dock-panel">
+          <div className="voice-dock-copy">
+            {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
+            <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
+            <div className="voice-dock-actions">
+              <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
+              {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
+            </div>
+          </div>
+        </div>
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={!modelUsable}
-          aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
+          disabled={modelBusy}
+          aria-label={modelUsable
+            ? (voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard)
+            : voiceModel.phase === "error" ? messages.voiceModel.retry : messages.voiceModel.download}
+          data-model-phase={voiceModel.phase}
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
-            voice.activate();
+            if (modelUsable) voice.activate();
+            else prepareVoiceModel();
           }}
-          onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
+          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) voice.release(); }}
           onPointerCancel={voice.cancel}
           onKeyDown={(event) => {
             if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
-              voice.activate();
+              if (modelUsable) voice.activate();
+              else prepareVoiceModel();
             }
           }}
-          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
+          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) voice.release(); }}
         >
-          <strong>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</strong>
+          <strong>{modelUsable ? "MIC" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          {modelUsable && <small>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</small>}
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
+          {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>
-        <div className="voice-dock-copy">
-          <div className="voice-dock-meta">
-            {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
-            <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
-          </div>
-          <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
-          {voiceModel.phase !== "ready" && voiceModel.phase !== "transcribing" && <VoiceModelStatus status={voiceModel} compact />}
-        </div>
       </div>}
 
       {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}

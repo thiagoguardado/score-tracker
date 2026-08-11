@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { VoiceModelStatus } from "../components/VoiceModelStatus";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
-import { useVoiceModel } from "../localTranscription";
+import { prepareVoiceModel, useVoiceModel } from "../localTranscription";
 import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
 import { useAppStore } from "../store";
 
@@ -43,6 +42,7 @@ export default function NewGamePage() {
   const microphone = useMicrophoneHealth();
   const running = useRef(false);
   const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
+  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing";
 
   useEffect(() => {
     if (running.current) {
@@ -209,26 +209,34 @@ export default function NewGamePage() {
       </section>
 
       <div className="voice-dock setup-voice-dock">
+        <div className="voice-dock-panel">
+          <div className="voice-dock-copy">
+            <small>{messages.setup.namesHint}</small>
+          </div>
+        </div>
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={!modelUsable}
+          disabled={modelBusy}
+          aria-label={modelUsable
+            ? (voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers)
+            : voiceModel.phase === "error" ? messages.voiceModel.retry : messages.voiceModel.download}
+          data-model-phase={voiceModel.phase}
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
-            void runVoiceSetup();
+            if (modelUsable) void runVoiceSetup();
+            else prepareVoiceModel();
           }}
-          onPointerUp={(event) => { event.preventDefault(); finishListening(); }}
+          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) finishListening(); }}
           onPointerCancel={() => { stopAudio(); }}
-          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) void runVoiceSetup(); }}
-          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") finishListening(); }}
+          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) { if (modelUsable) void runVoiceSetup(); else prepareVoiceModel(); } }}
+          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) finishListening(); }}
         >
-          <strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong>
+          <strong>{modelUsable ? "MIC" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          {modelUsable && <small>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</small>}
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
+          {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>
-        <div className="voice-dock-copy">
-          <small>{messages.setup.namesHint}</small>
-          <VoiceModelStatus status={voiceModel} compact />
-        </div>
       </div>
 
       {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}

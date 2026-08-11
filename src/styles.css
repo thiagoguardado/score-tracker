@@ -153,11 +153,11 @@ h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", Inter, sa
 .game-summary { margin-top: 8px; font-size: 0.82rem; font-weight: 800; }
 .game-card > .text-action { margin-left: 8px; }
 
-.topbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 48px; text-align: center; font-weight: 850; }
+.topbar { position: fixed; z-index: 30; top: 0; left: 50%; display: grid; width: min(100%, 760px); grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin: 0; padding: calc(18px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 22px max(20px, env(safe-area-inset-left)); color: var(--ink); text-align: center; font-weight: 850; background: color-mix(in srgb, var(--background) 90%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); backdrop-filter: blur(14px); transform: translateX(-50%); }
 .topbar > .text-action { justify-self: start; }
 .topbar > span:last-child { justify-self: end; width: 44px; }
 
-.setup-page { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+.setup-page { padding-top: calc(98px + env(safe-area-inset-top)); padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .setup-hero { text-align: left; }
 .setup-hero h1 { margin-bottom: 14px; font-size: clamp(3rem, 12vw, 5rem); font-weight: 850; line-height: 0.94; }
 .setup-hero > p:not(.eyebrow) { max-width: 430px; margin: 0; color: var(--muted); line-height: 1.55; }
@@ -198,8 +198,8 @@ h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", Inter, sa
 input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radius: var(--radius-small); color: var(--ink); background: var(--soft); }
 .manual-setup .text-button { margin: 10px 0 20px 38px; }
 
-.game-page { min-height: 100vh; padding-top: env(safe-area-inset-top); color: var(--ink); background: var(--background); }
-.game-topbar { display: grid; width: min(100%, 800px); grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin: 0 auto; padding: 18px max(18px, env(safe-area-inset-right)) 28px max(18px, env(safe-area-inset-left)); }
+.game-page { min-height: 100vh; color: var(--ink); background: var(--background); }
+.game-topbar { position: fixed; z-index: 30; top: 0; right: 0; left: 0; display: grid; width: 100%; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 22px max(20px, env(safe-area-inset-left)); background: color-mix(in srgb, var(--background) 90%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); backdrop-filter: blur(14px); }
 .game-topbar-actions { display: flex; align-items: center; gap: 6px; }
 .game-topbar button:focus-visible { outline-color: currentColor; }
 .game-title { min-width: 0; text-align: center; }
@@ -209,7 +209,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 
 .scoreboard-shell {
   min-height: calc(100vh - 82px - env(safe-area-inset-top));
-  padding: 26px max(20px, env(safe-area-inset-right)) calc(116px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: calc(106px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(150px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   border-radius: 0;
   color: var(--ink);
   background: var(--background);
@@ -253,23 +253,25 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .draft-score-chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
 .draft-score-chips span { font-size: 0.76rem; }
 .draft-score-chips strong { margin-left: 4px; font-size: 1rem; }
-.voice-dock { position: fixed; z-index: 20; right: 14px; bottom: calc(12px + env(safe-area-inset-bottom)); left: 14px; display: grid; max-width: 680px; min-height: 80px; grid-template-columns: minmax(136px, 190px) minmax(0, 1fr); align-items: center; gap: 12px; margin: auto; padding: 10px 12px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); }
+.voice-dock { position: fixed; z-index: 40; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); left: 12px; display: block; max-width: 680px; min-height: 112px; margin: auto; color: var(--inverse-ink); pointer-events: none; }
 .setup-voice-dock { grid-template-columns: minmax(144px, 190px) 1fr; }
+.voice-dock-panel { min-height: 112px; padding: 40px 16px 12px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); pointer-events: auto; }
 .voice-dock strong, .voice-dock small { display: block; }
-.voice-dock strong { font-size: 0.9rem; font-weight: 900; }
-.voice-dock small { margin-top: 3px; color: currentColor; font-size: 0.68rem; line-height: 1.25; opacity: 0.68; }
-.voice-dock-copy { display: grid; min-width: 0; align-content: center; }
-.voice-dock-meta { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
-.voice-dock-meta strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.main-mic { width: 100%; min-height: 60px; padding: 0 17px; border: 0; border-radius: var(--radius-pill); color: var(--ink); background: var(--background); font-size: 0.76rem; font-weight: 900; cursor: pointer; }
-.main-mic.active { color: var(--inverse-ink); background: var(--inverse); box-shadow: inset 0 0 0 2px var(--inverse-ink); }
-.manual-link { flex: 0 0 auto; min-height: 32px; padding: 0 2px; border: 0; color: currentColor; background: transparent; font-size: 0.68rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-.voice-dock .voice-model-status { margin-top: 4px; color: currentColor; font-size: 0.62rem; }
-.voice-dock .voice-model-status.ready { opacity: 0.62; }
-.voice-dock .voice-model-status .secondary-button { min-height: 38px; padding: 0 14px; color: var(--ink); background: var(--background); font-size: 0.7rem; }
-.voice-dock .voice-model-status progress { height: 4px; margin: 5px 0 0; background: rgb(127 127 127 / 35%); accent-color: currentColor; }
-.voice-dock .voice-model-status progress::-webkit-progress-bar { background: rgb(127 127 127 / 35%); }
-.voice-dock .voice-model-status progress::-webkit-progress-value { background: currentColor; }
+.voice-dock strong { font-size: 0.82rem; font-weight: 900; }
+.voice-dock small { margin-top: 3px; color: currentColor; font-size: 0.66rem; line-height: 1.25; opacity: 0.68; }
+.voice-dock-copy { display: block; min-width: 0; max-width: 75%; margin: 0 auto; text-align: center; }
+.voice-dock-copy > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-dock-actions { display: flex; min-height: 30px; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; }
+.main-mic { position: absolute; z-index: 2; top: -36px; left: 50%; display: grid; width: 96px; height: 96px; min-height: 96px; align-content: center; justify-items: center; padding: 0 10px; border: 0; border-radius: 50%; color: var(--ink); background: var(--background); font-size: 0.86rem; font-weight: 900; cursor: pointer; box-shadow: 0 8px 22px rgb(0 0 0 / 18%); transform: translateX(-50%); pointer-events: auto; }
+.main-mic strong { font-size: 1.05rem; line-height: 1; }
+.main-mic small { margin-top: 5px; color: currentColor; font-size: 0.58rem; line-height: 1; opacity: 0.64; }
+.main-mic.active { color: var(--inverse-ink); background: var(--inverse); box-shadow: inset 0 0 0 2px var(--inverse-ink), 0 8px 22px rgb(0 0 0 / 24%); }
+.main-mic:disabled { cursor: wait; }
+.manual-link { flex: 0 0 auto; min-height: 30px; padding: 0 2px; border: 0; color: currentColor; background: transparent; font-size: 0.68rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.voice-dock .voice-confirm { width: auto; min-height: 30px; margin: 0; padding: 0 14px; font-size: 0.7rem; }
+.mic-progress, .mic-volume { position: absolute; right: 16px; bottom: 13px; left: 16px; height: 3px; overflow: hidden; border-radius: var(--radius-pill); background: rgb(10 10 10 / 14%); }
+.mic-progress > span, .mic-volume > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: currentColor; transform: scaleX(0); transform-origin: left center; transition: transform 70ms linear; }
+.main-mic.active .mic-volume { background: rgb(255 255 255 / 18%); }
 
 .game-nav { display: grid; min-height: 52px; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin-bottom: 28px; padding: 4px; border: 0; border-radius: var(--radius-pill); color: var(--muted); background: var(--soft); }
 .game-nav button { min-width: 0; min-height: 44px; border: 0; border-radius: var(--radius-pill); color: inherit; background: transparent; font-size: 0.72rem; font-weight: 750; cursor: pointer; }
@@ -314,8 +316,9 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 
 @media (min-width: 760px) {
   .page { padding-top: 56px; }
-  .scoreboard-shell { padding-top: 40px; }
-  .game-topbar { padding-top: 22px; }
+  .setup-page { padding-top: calc(98px + env(safe-area-inset-top)); }
+  .scoreboard-shell { padding-top: calc(106px + env(safe-area-inset-top)); }
+  .game-topbar { padding-top: calc(22px + env(safe-area-inset-top)); }
   .sheet { align-self: center; border: 0; border-radius: var(--radius-large); box-shadow: var(--floating-shadow); }
 }
 

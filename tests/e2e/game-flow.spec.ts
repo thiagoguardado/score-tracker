@@ -11,8 +11,9 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
   await expect(page.getByLabel("Language")).toHaveCount(0);
   await expect(page.getByLabel("Theme")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Download offline voice" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Hold to say players" })).toBeDisabled();
+  const setupMic = page.locator(".setup-voice-dock .main-mic");
+  await expect(setupMic).toHaveAttribute("data-model-phase", "idle");
+  await expect(setupMic).toHaveAccessibleName("Download offline voice");
   await expect(page.locator(".setup-voice-dock")).toHaveCSS("position", "fixed");
   await page.getByLabel("Player 1 name").fill("Thiago");
   await page.getByLabel("Player 2 name").fill("Mario");

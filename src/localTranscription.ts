@@ -119,7 +119,8 @@ function getWorker(): Worker {
     if (message.type === "result") {
       pending.get(message.id)?.resolve(message.text);
       pending.delete(message.id);
-      publish({ ...status, phase: pending.size > 0 ? "transcribing" : "ready" });
+      const finalPending = [...pending.values()].some((request) => request.kind === "final");
+      publish({ ...status, phase: finalPending ? "transcribing" : "ready" });
       return;
     }
     if (message.type === "error") {
@@ -158,7 +159,9 @@ export function transcribeLocally(
   kind: TranscriptionKind = "final",
 ): Promise<string> {
   const id = nextRequestId++;
-  publish({ ...status, phase: "transcribing" });
+  // Partial text is a visual hint only. Keep the model button usable while a
+  // preview is running; only a final request should enter the busy state.
+  if (kind === "final") publish({ ...status, phase: "transcribing" });
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, kind });
     getWorker().postMessage({

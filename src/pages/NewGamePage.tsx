@@ -41,8 +41,8 @@ export default function NewGamePage() {
   const voiceModel = useVoiceModel();
   const microphone = useMicrophoneHealth();
   const running = useRef(false);
-  const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
-  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing";
+  const modelUsable = voiceModel.phase === "ready";
+  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing" || voiceModel.phase === "transcribing";
 
   useEffect(() => {
     if (running.current) {
@@ -65,6 +65,23 @@ export default function NewGamePage() {
       return;
     }
     commitGame(names);
+  };
+
+  const releaseVoiceInput = () => {
+    // Do not wait for Whisper to finish before restoring the normal button
+    // state. The capture is closed now; transcription can finish in the
+    // background without making the push-to-talk control look stuck.
+    if (running.current) {
+      setVoiceActive(false);
+      setVoiceMessage(messages.voiceModel.transcribing);
+      finishListening();
+    }
+  };
+
+  const cancelVoiceInput = () => {
+    running.current = false;
+    stopAudio();
+    setVoiceActive(false);
   };
 
   const runVoiceSetup = async () => {
@@ -227,12 +244,13 @@ export default function NewGamePage() {
             if (modelUsable) void runVoiceSetup();
             else prepareVoiceModel();
           }}
-          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) finishListening(); }}
-          onPointerCancel={() => { stopAudio(); }}
+          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) releaseVoiceInput(); }}
+          onPointerCancel={cancelVoiceInput}
+          onLostPointerCapture={releaseVoiceInput}
           onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) { if (modelUsable) void runVoiceSetup(); else prepareVoiceModel(); } }}
-          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) finishListening(); }}
+          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
         >
-          <strong>{modelUsable ? "MIC" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          <strong>{modelUsable ? "MIC" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
           {modelUsable && <small>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</small>}
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
           {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}

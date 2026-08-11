@@ -5,7 +5,11 @@ import type { SpeechEngine } from "./SpeechEngine";
 const FRAME_STALL_MS = 1_200;
 const NO_VOICE_MS = 3_000;
 const SILENCE_RMS = 0.0025;
-const PARTIAL_INTERVAL_MS = 1_600;
+// Keep the optional live preview out of the way of the normal short
+// push-to-talk utterance. A final result must start immediately when the
+// user releases the button; on mobile, starting Whisper before that release
+// can otherwise leave the final request waiting behind the preview.
+const PARTIAL_INTERVAL_MS = 2_400;
 const MIN_PARTIAL_SECONDS = 1.1;
 const LOG_KEY = "score-tracker:voice-log:v1";
 

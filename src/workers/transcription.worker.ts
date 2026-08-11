@@ -18,7 +18,9 @@ type Request =
   | { type: "transcribe"; id: number; audio: Float32Array; sampleRate: number; language: "en" | "pt"; kind: "partial" | "final" };
 
 let transcriberPromise: ReturnType<typeof createPreferredTranscriber> | undefined;
-let inferenceQueue: Promise<void> = Promise.resolve();
+type QueuedRequest = Extract<Request, { type: "transcribe" }>;
+const inferenceQueue: QueuedRequest[] = [];
+let inferenceRunning = false;
 let activeDevice: Device = "wasm";
 let readyAnnounced = false;
 let preferWebGpu = false;
@@ -93,23 +95,12 @@ self.addEventListener("message", async (event: MessageEvent<Request>) => {
     }
 
     const request = event.data;
-    inferenceQueue = inferenceQueue.then(async () => {
-      const transcriber = await getTranscriber();
-      const audio = resamplePcm(request.audio, request.sampleRate);
-      const output = await transcriber(audio, {
-        language: request.language === "pt" ? "portuguese" : "english",
-        task: "transcribe",
-        condition_on_prev_tokens: false,
-      });
-      const text = Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text;
-      self.postMessage({ type: "result", id: request.id, kind: request.kind, text: text.trim() });
-    }).catch((error) => {
-      self.postMessage({
-        type: "error",
-        id: request.id,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    });
+    // A final transcription is the only result that can change the game. Put
+    // it ahead of queued, optional previews without dropping those previews
+    // (their promises still need a result so they can settle cleanly).
+    if (request.kind === "final") inferenceQueue.unshift(request);
+    else inferenceQueue.push(request);
+    void drainInferenceQueue();
   } catch (error) {
     self.postMessage({
       type: "error",
@@ -118,5 +109,41 @@ self.addEventListener("message", async (event: MessageEvent<Request>) => {
     });
   }
 });
+
+async function drainInferenceQueue(): Promise<void> {
+  if (inferenceRunning) return;
+  inferenceRunning = true;
+  try {
+    while (inferenceQueue.length > 0) {
+      const request = inferenceQueue.shift()!;
+      try {
+        const transcriber = await getTranscriber();
+        const audio = resamplePcm(request.audio, request.sampleRate);
+        const output = await transcriber(audio, {
+          language: request.language === "pt" ? "portuguese" : "english",
+          task: "transcribe",
+          condition_on_prev_tokens: false,
+          // The score parser needs short command phrases, not long-form
+          // decoding. Greedy decoding is materially quicker on mobile WASM.
+          num_beams: 1,
+          do_sample: false,
+          return_timestamps: false,
+          max_new_tokens: 64,
+        });
+        const text = Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text;
+        self.postMessage({ type: "result", id: request.id, kind: request.kind, text: text.trim() });
+      } catch (error) {
+        self.postMessage({
+          type: "error",
+          id: request.id,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  } finally {
+    inferenceRunning = false;
+    if (inferenceQueue.length > 0) void drainInferenceQueue();
+  }
+}
 
 export {};

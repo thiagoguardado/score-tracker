@@ -290,6 +290,16 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     void run();
   }, [run, locale]);
 
+  const release = useCallback(() => {
+    // The microphone button must leave its pressed state as soon as the user
+    // releases it. Whisper may still need a moment to finish, but that work
+    // happens after capture has ended and must not make the control feel stuck.
+    if (sessionActive.current && ["starting", "listening"].includes(statusRef.current.phase)) {
+      updateStatus("parsing", messages.voice.phase.parsing, statusRef.current.transcript, pendingScoresRef.current);
+    }
+    finishListening();
+  }, [messages]);
+
   const cancel = useCallback(() => {
     sessionActive.current = false;
     pendingScoresRef.current = undefined;
@@ -332,5 +342,5 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     })();
   }, [game, locale, messages, onAddRound, onDeleteRound, onFinish]);
 
-  return { status, activate, release: finishListening, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume, microphone };
+  return { status, activate, release, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume, microphone };
 }

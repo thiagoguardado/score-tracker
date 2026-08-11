@@ -235,8 +235,8 @@ export default function GamePage() {
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
   const voiceActive = voice.status.phase === "starting" || voice.status.phase === "listening";
-  const modelUsable = voiceModel.phase === "ready" || voiceModel.phase === "transcribing";
-  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing";
+  const modelUsable = voiceModel.phase === "ready";
+  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing" || voiceModel.phase === "transcribing";
   const showVoiceCard = voice.status.phase !== "idle" || voice.confirmationPending;
 
   const share = async () => {
@@ -341,6 +341,7 @@ export default function GamePage() {
           }}
           onPointerUp={(event) => { event.preventDefault(); if (modelUsable) voice.release(); }}
           onPointerCancel={voice.cancel}
+          onLostPointerCapture={() => { if (modelUsable) voice.release(); }}
           onKeyDown={(event) => {
             if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
               if (modelUsable) voice.activate();
@@ -349,7 +350,7 @@ export default function GamePage() {
           }}
           onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) voice.release(); }}
         >
-          <strong>{modelUsable ? "MIC" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
+          <strong>{modelUsable ? "MIC" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
           {modelUsable && <small>{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</small>}
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
           {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}

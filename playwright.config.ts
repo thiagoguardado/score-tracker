@@ -15,7 +15,11 @@ export default defineConfig({
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npx vite --host 127.0.0.1 --port 4173",
+    // CI serves the already-built artifact so Vite dependency optimization or
+    // HMR cannot reload the page while a modal interaction is in progress.
+    command: process.env.CI
+      ? "npx vite preview --host 127.0.0.1 --port 4173"
+      : "npx vite --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
   },

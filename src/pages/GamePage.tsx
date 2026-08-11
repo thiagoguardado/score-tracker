@@ -61,7 +61,7 @@ function ScoreForm({ game, initial, title, onSave, onClose }: {
     onSave(Object.fromEntries(game.players.map((player) => [player.id, Number.parseInt(scoreInputs[player.id], 10)])));
   };
   return (
-    <div className="modal-backdrop" role="presentation" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="modal-backdrop" role="presentation">
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="score-form-title">
         <div className="sheet-header">
           <div><p className="eyebrow">{messages.game.manualEntry}</p><h2 id="score-form-title">{title}</h2></div>

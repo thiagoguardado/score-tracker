@@ -28,9 +28,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx playwright install --with-deps chromium
-      # Mobile viewport checks are run locally; CI uses the deterministic desktop
-      # browser for the full functional flow and keeps deployment unblocked.
-      - run: npm run test:e2e -- --project=desktop-chromium
+      # Keep the browser matrix serial so modal interactions are isolated on
+      # the Linux runner while preserving mobile and desktop coverage.
+      - run: npm run test:e2e -- --workers=1
       - name: Upload browser failure details
         if: failure()
         uses: actions/upload-artifact@v4

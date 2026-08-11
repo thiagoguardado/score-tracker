@@ -9,9 +9,9 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    // Use a mobile viewport without isMobile/touch emulation. This keeps the
-    // responsive layout coverage deterministic on Linux CI and Windows.
-    { name: "mobile-chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 412, height: 915 } } },
+    // Keep a current Android profile available for local mobile regression runs.
+    // CI intentionally runs the deterministic desktop project (see workflow).
+    { name: "mobile-chromium", use: { ...devices["Pixel 10"], hasTouch: false } },
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {

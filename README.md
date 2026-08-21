@@ -13,14 +13,14 @@ The app is English-first and currently includes Brazilian Portuguese. On first u
 - multiple games stored on the device;
 - rankings recalculated from rounds, including shared positions for ties;
 - native result sharing with clipboard fallback;
-- local Whisper Tiny speech recognition running in a Web Worker with no transcription API calls;
-- progressive local transcription while the push-to-talk button is held;
-- installable PWA with offline access to voice, the manual app, and saved data after the initial model download;
+- on-device speech recognition via the platform Web Speech API (no model download, no transcription API calls);
+- push-to-talk with interim transcript while the button is held;
+- installable PWA with offline access to the manual app and saved data;
 - Screen Wake Lock during active games when supported.
 - monochrome, text-only interface with no decorative images or in-app icons.
 - system, light, and dark themes with a persistent manual preference.
 
-No persistent action is applied until it is confirmed. Short push-to-talk recordings exist only in memory while they are transcribed and are never persisted or uploaded.
+No persistent action is applied until it is confirmed. Short voice turns exist only in memory while they are recognized and are never persisted or uploaded.
 
 ## Development
 
@@ -63,22 +63,28 @@ Portuguese examples:
 - `desfazer a última rodada`
 - `finalizar jogo`
 
-## Offline voice recognition
+## Voice recognition (native)
 
-The app uses `getUserMedia`, one persistent `AudioContext`, an `AudioWorklet`, Transformers.js, and the multilingual quantized `onnx-community/whisper-base` model. It does not use `SpeechRecognition`, `MediaRecorder`, Siri, or a transcription API. The worklet continuously verifies that PCM frames are flowing; push-to-talk only gates which samples are sent to Whisper, so consecutive commands do not recreate the iOS microphone session. The base model is a modestly larger offline download than tiny, but is substantially more reliable for names and numbers.
+The app uses the platform `SpeechRecognition` / `webkitSpeechRecognition` and `speechSynthesis` directly — no `getUserMedia`, `AudioWorklet`, `MediaRecorder`, Transformers.js, Whisper model, or transcription API. This keeps the mic session owned solely by the OS speech service, which is what fixes the iPhone failure mode where the orange dot never appeared and subsequent turns produced no audio.
 
-The first visit to a voice screen downloads the quantized model weights and the local engine (about 80 MB combined). The UI distinguishes downloading from device initialization and only reports offline readiness after Transformers.js verifies the model cache. WebGPU is attempted when available; a timed or failed initialization falls back to WASM. The service worker precaches the app and WASM runtime. Later sessions can transcribe offline unless the browser evicts site storage.
+Why it now reliably works on iPhone:
 
-Whisper Tiny is multilingual, so English and Portuguese share one model download. The selected app language is passed to every local transcription request and changes immediately when the language selector changes.
+- no competing `getUserMedia` stream — the previous volume-meter stream stole the mic from the speech service on iOS; volume feedback is now synthetic and no secondary AudioContext is created;
+- one fresh `SpeechRecognition` instance per user gesture, never reused — `start()` is called synchronously inside the `pointerDown` handler;
+- full teardown with `stop()`/`abort()` grace timers (750 ms + 250 ms fallback) so the next `start()` never collides with a still-releasing session;
+- push-to-talk gating: `pointerDown` → `recognition.start()`, `pointerUp`/`pointerCancel`/`lostPointerCapture` → `recognition.stop()`; interim results (`interimResults=true`) stream partial text while held;
+- serial single-turn loop — each press yields exactly one transcript; the UI requires a new tap to capture again (`waitingForTap` / `tapToContinue`), respecting the iOS rule that each recognition must be tied to a user gesture;
+- speech output cancels any active recognition and resumes afterwards with a short `speechSynthesis` grace period, avoiding audio-session contention.
+
+The selected app language (`en-US` / `pt-BR`) is passed as `recognition.lang` and as `utterance.lang` for synthesis. Player names are supplied as `maxAlternatives` hints (`preferredPhrases`) and re-ranked locally for better name/number accuracy.
 
 The required device flow is:
 
-1. wait until offline voice recognition is ready;
-2. press and hold the voice button;
-3. say player names, scores, or a command while partial text appears;
-4. release to produce the final transcript;
-5. review the recognized values and press `Confirm`;
-6. listen to the complete ranking.
+1. tap and hold the voice button (a user gesture);
+2. say player names, scores, or a command while interim text appears;
+3. release to produce the final transcript;
+4. review the recognized values and press `Confirm`;
+5. listen to the spoken ranking.
 
 ## Data
 

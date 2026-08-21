@@ -1,87 +1,49 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { transcribeLocally } from "./localTranscription";
-import {
-  finishListening,
-  getSpeechErrorCode,
-  listenOnce,
-  releaseMicrophoneCapture,
-  speak,
-  SpeechCaptureFailure,
-  stopAudio,
-} from "./speech";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { finishListening, getSpeechErrorCode, listenOnce, releaseMicrophoneCapture, speak, SpeechCaptureFailure, SpeechRecognitionFailure, stopAudio, supportsRecognition } from "./speech";
 
-vi.mock("./localTranscription", () => ({
-  prepareVoiceModel: vi.fn(),
-  transcribeLocally: vi.fn(),
-}));
-
-class FakeTrack extends EventTarget {
-  enabled = true;
-  readyState: MediaStreamTrackState = "live";
-  muted = false;
+class FakeRecognition {
+  lang = "";
+  continuous = false;
+  interimResults = false;
+  maxAlternatives = 1;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null = null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null = null;
+  onend: (() => void) | null = null;
+  onstart: (() => void) | null = null;
+  onaudiostart: (() => void) | null = null;
+  onsoundstart: (() => void) | null = null;
+  onspeechstart: (() => void) | null = null;
+  onspeechend: (() => void) | null = null;
+  startedAt = 0;
+  start() {
+    this.startedAt = Date.now();
+    queueMicrotask(() => {
+      this.onstart?.();
+      this.onaudiostart?.();
+      this.onsoundstart?.();
+      this.onspeechstart?.();
+      // default final result
+      this.onresult?.({
+        resultIndex: 0,
+        results: {
+          0: { 0: { transcript: "Alex ten Sam seven" }, length: 1, isFinal: true } as unknown as SpeechRecognitionResult,
+          length: 1,
+        },
+      } as unknown as SpeechRecognitionEvent);
+    });
+  }
   stop() {
-    this.readyState = "ended";
-    this.dispatchEvent(new Event("ended"));
+    queueMicrotask(() => this.onend?.());
   }
-}
-
-class FakeStream {
-  active = true;
-  track = new FakeTrack();
-  getTracks() { return [this.track]; }
-  getAudioTracks() { return [this.track]; }
-}
-
-type PortMessage = { type: string; open?: boolean; captureId?: number };
-
-class FakePort {
-  onmessage: ((event: MessageEvent) => void) | null = null;
-  captureId = 0;
-  gateOpen = false;
-
-  postMessage(message: PortMessage) {
-    if (message.type !== "gate") return;
-    this.captureId = message.captureId ?? 0;
-    this.gateOpen = Boolean(message.open);
-    if (!message.open) queueMicrotask(() => this.emit({ type: "flushed", captureId: this.captureId }));
+  abort() {
+    queueMicrotask(() => {
+      this.onerror?.({ error: "aborted", message: "" } as unknown as SpeechRecognitionErrorEvent);
+      this.onend?.();
+    });
   }
-
-  emit(data: unknown) {
-    this.onmessage?.(new MessageEvent("message", { data }));
-  }
-
-  emitAudio(audio: Float32Array, rms = 0.05) {
-    this.emitHealth(rms, audio.length);
-    if (this.gateOpen) this.emit({ type: "pcm", captureId: this.captureId, audio });
-  }
-
-  emitHealth(rms = 0.05, samplesReceived = 128) {
-    this.emit({ type: "health", framesReceived: 2, samplesReceived, rms, peak: rms * 2 });
-  }
-}
-
-class FakeAudioWorkletNode {
-  static instances: FakeAudioWorkletNode[] = [];
-  port = new FakePort();
-  constructor() {
-    FakeAudioWorkletNode.instances.push(this);
-    window.setTimeout(() => {
-      this.port.emit({ type: "ready", sampleRate: 48_000 });
-      this.port.emit({ type: "health", framesReceived: 1, samplesReceived: 128, rms: 0, peak: 0 });
-    }, 0);
-  }
-  connect<T>(target: T): T { return target; }
-}
-
-class FakeAudioContext extends EventTarget {
-  state: AudioContextState = "running";
-  sampleRate = 48_000;
-  destination = {};
-  audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
-  createMediaStreamSource() { return { connect: <T>(target: T) => target }; }
-  createGain() { return { gain: { value: 1 }, connect: <T>(target: T) => target }; }
-  async resume() { this.state = "running"; }
-  async close() { this.state = "closed"; }
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() { return true; }
 }
 
 class FakeUtterance {
@@ -94,134 +56,195 @@ class FakeUtterance {
   constructor(text: string) { this.text = text; }
 }
 
-async function startCapture(locale: "en" | "pt-BR") {
-  const onCaptureStart = vi.fn();
-  const result = listenOnce(locale, 10_000, [], onCaptureStart);
-  await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
-  return { result, node: FakeAudioWorkletNode.instances.at(-1)! };
-}
-
-describe("AudioWorklet speech capture", () => {
-  let getUserMedia: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    FakeAudioWorkletNode.instances = [];
-    getUserMedia = vi.fn().mockResolvedValue(new FakeStream());
-    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
-    vi.stubGlobal("AudioContext", FakeAudioContext);
-    vi.stubGlobal("AudioWorkletNode", FakeAudioWorkletNode);
-    vi.mocked(transcribeLocally).mockResolvedValue("Mario five");
-  });
-
+describe("native speech — iOS-hardened", () => {
   afterEach(() => {
     stopAudio();
     releaseMicrophoneCapture();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
-    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    delete (window as unknown as Record<string, unknown>).SpeechRecognition;
+    delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
   });
 
-  it("sends raw PCM and its source sample rate to the selected local language", async () => {
-    const { result, node } = await startCapture("pt-BR");
-    node.port.emitAudio(new Float32Array(4_800).fill(0.05));
-    finishListening();
-    await expect(result).resolves.toBe("Mario five");
-    expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), 48_000, "pt-BR", "final");
+  it("supportsRecognition is false without Web Speech API", () => {
+    expect(supportsRecognition()).toBe(false);
   });
 
-  it("passes known player names as transcription context", async () => {
+  it("configures recognition for the selected language", async () => {
+    let recognition: FakeRecognition | undefined;
+    class Recognition extends FakeRecognition {
+      constructor() { super(); recognition = this; }
+    }
+    window.SpeechRecognition = Recognition as unknown as SpeechRecognitionConstructor;
+    await expect(listenOnce("en")).resolves.toBe("Alex ten Sam seven");
+    expect(recognition?.lang).toBe("en-US");
+    await expect(listenOnce("pt-BR")).resolves.toBe("Alex ten Sam seven");
+    expect(recognition?.lang).toBe("pt-BR");
+  });
+
+  it("does not require getUserMedia — no orange-dot contention", async () => {
+    const getUserMedia = vi.fn();
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+    class Recognition extends FakeRecognition {}
+    window.SpeechRecognition = Recognition as unknown as SpeechRecognitionConstructor;
+    await expect(listenOnce("en")).resolves.toBe("Alex ten Sam seven");
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("uses push-to-talk: finishListening triggers stop and resolves", async () => {
+    class HoldRecognition extends FakeRecognition {
+      start() {
+        queueMicrotask(() => { this.onstart?.(); this.onaudiostart?.(); });
+      }
+      stop() { queueMicrotask(() => this.onend?.()); }
+    }
+    window.SpeechRecognition = HoldRecognition as unknown as SpeechRecognitionConstructor;
     const onCaptureStart = vi.fn();
-    const result = listenOnce("pt-BR", 10_000, ["Thiago", "Mário"], onCaptureStart);
+    const promise = listenOnce("en", 10_000, [], onCaptureStart);
     await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
-    const node = FakeAudioWorkletNode.instances.at(-1)!;
-    node.port.emitAudio(new Float32Array(4_800).fill(0.05));
+    stopAudio();
+    await expect(promise).rejects.toMatchObject({ code: "aborted" });
+
+    // Now test successful hold until release
+    class SuccessHold extends FakeRecognition {
+      resultSent = false;
+      start() { queueMicrotask(() => { this.onstart?.(); this.onaudiostart?.(); }); }
+      stop() {
+        if (!this.resultSent) {
+          this.resultSent = true;
+          this.onresult?.({
+            resultIndex: 0,
+            results: { 0: { 0: { transcript: "Mario five" }, length: 1, isFinal: true } as unknown as SpeechRecognitionResult, length: 1 },
+          } as unknown as SpeechRecognitionEvent);
+        }
+        queueMicrotask(() => this.onend?.());
+      }
+    }
+    window.SpeechRecognition = SuccessHold as unknown as SpeechRecognitionConstructor;
+    const success = listenOnce("en", 10_000, [], vi.fn());
+    await new Promise((r) => setTimeout(r, 0));
     finishListening();
-    await result;
-    expect(transcribeLocally).toHaveBeenCalledWith(expect.any(Float32Array), 48_000, "pt-BR", "final", ["Thiago", "Mário"]);
+    await expect(success).resolves.toBe("Mario five");
   });
 
-  it("keeps one microphone and AudioWorklet pipeline across consecutive presses", async () => {
-    const first = await startCapture("en");
-    first.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
-    finishListening();
-    await first.result;
-
-    const second = await startCapture("en");
-    second.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
-    finishListening();
-    await second.result;
-
-    expect(getUserMedia).toHaveBeenCalledTimes(1);
-    expect(FakeAudioWorkletNode.instances).toHaveLength(1);
-  });
-
-  it("reconnects the pipeline on the next user press after returning from the background", async () => {
-    const first = await startCapture("en");
-    first.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
-    finishListening();
-    await first.result;
-
-    Object.defineProperty(document, "hidden", { configurable: true, value: true });
-    document.dispatchEvent(new Event("visibilitychange"));
-    Object.defineProperty(document, "hidden", { configurable: true, value: false });
-    document.dispatchEvent(new Event("visibilitychange"));
-
-    const second = await startCapture("en");
-    second.node.port.emitAudio(new Float32Array(4_800).fill(0.05));
-    finishListening();
-    await second.result;
-    expect(getUserMedia).toHaveBeenCalledTimes(2);
-    expect(FakeAudioWorkletNode.instances).toHaveLength(2);
-  });
-
-  it("does not send silent PCM to Whisper", async () => {
-    const { result, node } = await startCapture("en");
-    node.port.emitAudio(new Float32Array(4_800), 0);
-    finishListening();
-    await expect(result).rejects.toMatchObject({ code: "no-speech" });
-    expect(transcribeLocally).not.toHaveBeenCalled();
-  });
-
-  it("fails fast when the microphone stays live but PCM frames stop", async () => {
-    const { result } = await startCapture("en");
-    await expect(result).rejects.toMatchObject({ code: "pcm-stalled" });
-    expect(transcribeLocally).not.toHaveBeenCalled();
-  }, 3_000);
-
-  it("waits until release before transcribing", async () => {
-    vi.mocked(transcribeLocally).mockResolvedValue("Mario five");
+  it("emits interim transcripts while held", async () => {
+    class InterimRecognition extends FakeRecognition {
+      start() {
+        queueMicrotask(() => {
+          this.onstart?.();
+          this.onaudiostart?.();
+          this.onresult?.({
+            resultIndex: 0,
+            results: { 0: { 0: { transcript: "Alex" }, length: 1, isFinal: false } as unknown as SpeechRecognitionResult, length: 1 },
+          } as unknown as SpeechRecognitionEvent);
+          setTimeout(() => {
+            this.onresult?.({
+              resultIndex: 0,
+              results: { 0: { 0: { transcript: "Alex ten" }, length: 1, isFinal: true } as unknown as SpeechRecognitionResult, length: 1 },
+            } as unknown as SpeechRecognitionEvent);
+          }, 10);
+        });
+      }
+    }
+    window.SpeechRecognition = InterimRecognition as unknown as SpeechRecognitionConstructor;
     const onInterim = vi.fn();
-    const onCaptureStart = vi.fn();
-    const result = listenOnce("en", 10_000, [], onCaptureStart, undefined, onInterim);
-    await vi.waitFor(() => expect(onCaptureStart).toHaveBeenCalled());
-    const port = FakeAudioWorkletNode.instances.at(-1)!.port;
-    port.emitAudio(new Float32Array(60_000).fill(0.05));
-    const healthTimer = window.setInterval(() => port.emitHealth(), 200);
-    await new Promise((resolve) => window.setTimeout(resolve, 2_500));
-    window.clearInterval(healthTimer);
-    expect(onInterim).not.toHaveBeenCalled();
-    expect(transcribeLocally).not.toHaveBeenCalled();
-    finishListening();
-    await expect(result).resolves.toBe("Mario five");
-    expect(transcribeLocally).toHaveBeenCalledTimes(1);
+    const result = listenOnce("en", 10_000, [], vi.fn(), vi.fn(), onInterim);
+    await expect(result).resolves.toBe("Alex ten");
+    expect(onInterim).toHaveBeenCalledWith("Alex");
   });
 
-  it("preserves a microphone acquisition failure", async () => {
-    releaseMicrophoneCapture();
-    getUserMedia.mockRejectedValueOnce(new Error("No audio input device"));
-    const failure = await listenOnce("pt-BR").catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(SpeechCaptureFailure);
+  it("preserves the native recognition error code and detail", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    class FailingRecognition extends FakeRecognition {
+      start() { queueMicrotask(() => this.onerror?.({ error: "audio-capture", message: "No audio input device" } as unknown as SpeechRecognitionErrorEvent)); }
+    }
+    window.SpeechRecognition = FailingRecognition as unknown as SpeechRecognitionConstructor;
+    const failure = await listenOnce("pt-BR").catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(SpeechRecognitionFailure);
     expect(failure).toMatchObject({ code: "audio-capture", detail: "No audio input device" });
     expect(getSpeechErrorCode(failure)).toBe("audio-capture");
+    expect(warn).toHaveBeenCalledWith("Speech recognition failed", { code: "audio-capture", detail: "No audio input device" });
+  });
+
+  it("fully ends one recognition session before starting the next (no overlap)", async () => {
+    let active = 0;
+    let maximumActive = 0;
+    let stops = 0;
+    class SequentialRecognition extends FakeRecognition {
+      start() {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        super.start();
+      }
+      stop() {
+        stops += 1;
+        queueMicrotask(() => { active -= 1; this.onend?.(); });
+      }
+    }
+    window.SpeechRecognition = SequentialRecognition as unknown as SpeechRecognitionConstructor;
+    await expect(listenOnce("pt-BR")).resolves.toBe("Alex ten Sam seven");
+    await expect(listenOnce("pt-BR")).resolves.toBe("Alex ten Sam seven");
+    expect(stops).toBe(2);
+    expect(maximumActive).toBe(1);
+  });
+
+  it("prefers an alternative transcript containing a known player name", async () => {
+    let recognition: FakeRecognition | undefined;
+    class AlternativeRecognition extends FakeRecognition {
+      constructor() { super(); recognition = this; }
+      start() {
+        queueMicrotask(() => this.onresult?.({
+          resultIndex: 0,
+          results: {
+            0: { 0: { transcript: "Maria cinco" }, 1: { transcript: "Mário cinco" }, length: 2, isFinal: true } as unknown as SpeechRecognitionResult,
+            length: 1,
+          },
+        } as unknown as SpeechRecognitionEvent));
+      }
+    }
+    window.SpeechRecognition = AlternativeRecognition as unknown as SpeechRecognitionConstructor;
+    await expect(listenOnce("pt-BR", 10_000, ["Mário"])).resolves.toBe("Mário cinco");
+    expect(recognition?.maxAlternatives).toBe(5);
+  });
+
+  it("does not time out a long utterance after speech has started", async () => {
+    vi.useFakeTimers();
+    class LongRecognition extends FakeRecognition {
+      start() {
+        this.onstart?.();
+        this.onaudiostart?.();
+        setTimeout(() => this.onspeechstart?.(), 9_000);
+        setTimeout(() => {
+          this.onresult?.({
+            resultIndex: 0,
+            results: { 0: { 0: { transcript: "five player names spoken slowly" }, length: 1, isFinal: true } as unknown as SpeechRecognitionResult, length: 1 },
+          } as unknown as SpeechRecognitionEvent);
+        }, 15_000);
+      }
+    }
+    window.SpeechRecognition = LongRecognition as unknown as SpeechRecognitionConstructor;
+    const result = listenOnce("en", 10_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(result).resolves.toBe("five player names spoken slowly");
   });
 
   it("reports an intentional interruption as aborted", async () => {
-    const { result } = await startCapture("en");
+    class WaitingRecognition extends FakeRecognition {
+      start() { this.onstart?.(); }
+    }
+    window.SpeechRecognition = WaitingRecognition as unknown as SpeechRecognitionConstructor;
+    const result = listenOnce("en");
+    await Promise.resolve();
     stopAudio();
     await expect(result).rejects.toMatchObject({ code: "aborted" });
   });
 
-  it("configures synthesis for the selected language without disposing the microphone", async () => {
+  it("accepts SpeechCaptureFailure alias for backward compat", () => {
+    const e = new SpeechCaptureFailure("aborted", "test");
+    expect(getSpeechErrorCode(e)).toBe("aborted");
+  });
+
+  it("configures synthesis for the selected language and cancels any active recognition", async () => {
     let utterance: FakeUtterance | undefined;
     vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
     Object.defineProperty(window, "speechSynthesis", {
@@ -229,15 +252,17 @@ describe("AudioWorklet speech capture", () => {
       value: {
         cancel: vi.fn(),
         getVoices: vi.fn(() => []),
-        speak: vi.fn((next: FakeUtterance) => {
-          utterance = next;
-          queueMicrotask(() => next.onend?.());
-        }),
+        speak: vi.fn((next: FakeUtterance) => { utterance = next; queueMicrotask(() => next.onend?.()); }),
       },
     });
-
+    class WaitingRecognition extends FakeRecognition { start() { this.onstart?.(); } }
+    window.SpeechRecognition = WaitingRecognition as unknown as SpeechRecognitionConstructor;
+    const listening = listenOnce("en");
+    const listeningExpect = expect(listening).rejects.toMatchObject({ code: "aborted" });
+    await Promise.resolve();
     await speak("Hello", "en");
     expect(utterance?.lang).toBe("en-US");
+    await listeningExpect;
     await speak("Olá", "pt-BR");
     expect(utterance?.lang).toBe("pt-BR");
   });

@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { rankingFor, shareText } from "../domain/ranking";
 import { useVoiceConversation } from "../hooks/useVoiceConversation";
 import { useI18n, type Locale, type Messages } from "../i18n";
-import { prepareVoiceModel, useVoiceModel } from "../localTranscription";
 import { useAppStore } from "../store";
 import { releaseMicrophoneCapture } from "../speech";
 import type { Game, PlayerId, Round, VoicePhase } from "../types";
@@ -212,7 +211,6 @@ export default function GamePage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [editingFinished, setEditingFinished] = useState(false);
   const [toast, setToast] = useState("");
-  const voiceModel = useVoiceModel();
 
   const onAddRound = useCallback((scores: Record<PlayerId, number>) => {
     if (game) addRound(game.id, scores, "voice");
@@ -235,8 +233,6 @@ export default function GamePage() {
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
   const voiceActive = voice.status.phase === "starting" || voice.status.phase === "listening";
-  const modelUsable = voiceModel.phase === "ready";
-  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing" || voiceModel.phase === "transcribing";
   const showVoiceCard = voice.status.phase !== "idle" || voice.confirmationPending;
 
   const share = async () => {
@@ -318,7 +314,7 @@ export default function GamePage() {
       {game.status === "active" && <div className="voice-dock">
         <div className="voice-dock-panel">
           <div className="voice-dock-copy">
-            {modelUsable && <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>}
+            <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>
             <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
             <div className="voice-dock-actions">
               <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
@@ -328,32 +324,23 @@ export default function GamePage() {
         </div>
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={modelBusy}
-          aria-label={modelUsable
-            ? (voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard)
-            : voiceModel.phase === "error" ? messages.voiceModel.retry : messages.voiceModel.download}
-          data-model-phase={voiceModel.phase}
+          aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
-            if (modelUsable) voice.activate();
-            else prepareVoiceModel();
+            voice.activate();
           }}
-          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) voice.release(); }}
+          onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
           onPointerCancel={voice.cancel}
-          onLostPointerCapture={() => { if (modelUsable) voice.release(); }}
+          onLostPointerCapture={() => voice.release()}
           onKeyDown={(event) => {
-            if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
-              if (modelUsable) voice.activate();
-              else prepareVoiceModel();
-            }
+            if ((event.key === "Enter" || event.key === " ") && !event.repeat) voice.activate();
           }}
-          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) voice.release(); }}
+          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
         >
-          <strong aria-hidden="true">{modelUsable ? "🎤" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
-          <span className="sr-only">{modelUsable ? (voiceActive ? messages.game.stopVoice : messages.game.startVoice) : ""}</span>
+          <strong aria-hidden="true">🎤</strong>
+          <span className="sr-only">{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
-          {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>
       </div>}
 

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
-import { prepareVoiceModel, useVoiceModel } from "../localTranscription";
 import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
 import { useAppStore } from "../store";
 
@@ -23,6 +22,7 @@ function setupSpeechError(code: string, messages: Messages): string {
   if (code === "no-speech") return messages.setup.noSpeechError;
   if (code === "audio-capture") return messages.setup.audioCaptureError;
   if (code === "pcm-stalled") return messages.voice.pcmStalled;
+  if (code === "microphone-interrupted") return messages.voice.microphoneInterrupted;
   if (code === "network") return messages.setup.networkSpeechError;
   if (code === "aborted") return messages.setup.interruptedSpeechError;
   if (code === "language-not-supported") return messages.setup.languageSpeechError;
@@ -38,11 +38,9 @@ export default function NewGamePage() {
   const [voiceActive, setVoiceActive] = useState(false);
   const [volume, setVolume] = useState(0);
   const [error, setError] = useState("");
-  const voiceModel = useVoiceModel();
   const microphone = useMicrophoneHealth();
   const running = useRef(false);
-  const modelUsable = voiceModel.phase === "ready";
-  const modelBusy = voiceModel.phase === "downloading" || voiceModel.phase === "initializing" || voiceModel.phase === "transcribing";
+  const supported = supportsRecognition();
 
   useEffect(() => {
     if (running.current) {
@@ -68,12 +66,9 @@ export default function NewGamePage() {
   };
 
   const releaseVoiceInput = () => {
-    // Do not wait for Whisper to finish before restoring the normal button
-    // state. The capture is closed now; transcription can finish in the
-    // background without making the push-to-talk control look stuck.
     if (running.current) {
       setVoiceActive(false);
-      setVoiceMessage(messages.voiceModel.transcribing);
+      setVoiceMessage(messages.setup.listening);
       finishListening();
     }
   };
@@ -92,7 +87,7 @@ export default function NewGamePage() {
       setVoiceMessage(messages.setup.conversationEnded);
       return;
     }
-    if (!supportsRecognition()) {
+    if (!supported) {
       setError(messages.setup.voiceUnavailableLong);
       return;
     }
@@ -231,31 +226,26 @@ export default function NewGamePage() {
         </div>
         <button
           className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={modelBusy}
-          aria-label={modelUsable
-            ? (voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers)
-            : voiceModel.phase === "error" ? messages.voiceModel.retry : messages.voiceModel.download}
-          data-model-phase={voiceModel.phase}
+          disabled={supported ? false : true}
+          aria-label={voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
-            if (modelUsable) void runVoiceSetup();
-            else prepareVoiceModel();
+            if (supported) void runVoiceSetup();
           }}
-          onPointerUp={(event) => { event.preventDefault(); if (modelUsable) releaseVoiceInput(); }}
+          onPointerUp={(event) => { event.preventDefault(); if (supported) releaseVoiceInput(); }}
           onPointerCancel={cancelVoiceInput}
           onLostPointerCapture={releaseVoiceInput}
-          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat) { if (modelUsable) void runVoiceSetup(); else prepareVoiceModel(); } }}
-          onKeyUp={(event) => { if (modelUsable && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
+          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat && supported) void runVoiceSetup(); }}
+          onKeyUp={(event) => { if (supported && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
         >
-          <strong aria-hidden="true">{modelUsable ? "🎤" : voiceModel.phase === "transcribing" ? "…" : modelBusy ? `${Math.round(voiceModel.progress)}%` : "↓"}</strong>
-          <span className="sr-only">{modelUsable ? (voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers) : ""}</span>
+          <strong aria-hidden="true">🎤</strong>
+          <span className="sr-only">{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</span>
           <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
-          {!modelUsable && <span className="mic-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, voiceModel.progress / 100))})` }} /></span>}
         </button>
       </div>
 
-      {!supportsRecognition() && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
+      {!supported && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}
     </main>
   );
 }

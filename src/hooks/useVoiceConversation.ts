@@ -101,6 +101,9 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     const code = getSpeechErrorCode(error);
     if (code.includes("not-allowed") || code.includes("service-not-allowed")) return messages.voice.microphonePermissionDiagnostic(code);
     if (code.includes("unavailable")) return messages.voice.unavailableBrowser;
+    if (code.includes("audio-capture")) return messages.voice.microphoneInterrupted;
+    if (code.includes("network")) return messages.voice.failedSafelyDiagnostic(code);
+    if (code.includes("language-not-supported")) return messages.voice.failedSafelyDiagnostic(code);
     if (code.includes("pcm-stalled")) return messages.voice.pcmStalled;
     if (code.includes("microphone-interrupted")) return messages.voice.microphoneInterrupted;
     if (code.includes("aborted")) return messages.voice.microphoneInterrupted;
@@ -292,8 +295,9 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
 
   const release = useCallback(() => {
     // The microphone button must leave its pressed state as soon as the user
-    // releases it. Whisper may still need a moment to finish, but that work
-    // happens after capture has ended and must not make the control feel stuck.
+    // releases it. Native recognition may still need a moment to finalize,
+    // but that work happens after capture has ended and must not make the
+    // control feel stuck.
     if (sessionActive.current && ["starting", "listening"].includes(statusRef.current.phase)) {
       updateStatus("parsing", messages.voice.phase.parsing, statusRef.current.transcript, pendingScoresRef.current);
     }

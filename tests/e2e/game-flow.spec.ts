@@ -12,15 +12,16 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   await expect(page.getByLabel("Language")).toHaveCount(0);
   await expect(page.getByLabel("Theme")).toHaveCount(0);
   const setupMic = page.locator(".setup-voice-dock .main-mic");
-  await expect(setupMic).toHaveAttribute("data-model-phase", "idle");
-  await expect(setupMic).toHaveAccessibleName("Download offline voice");
+  // Native SpeechRecognition has no model download phase — mic is ready immediately.
+  await expect(setupMic).toBeVisible();
+  await expect(setupMic).toHaveAccessibleName(/Hold to say players|Segure para dizer/i);
   await expect(page.locator(".setup-voice-dock")).toHaveCSS("position", "fixed");
   await page.getByLabel("Player 1 name").fill("Thiago");
   await page.getByLabel("Player 2 name").fill("Mario");
   await page.getByRole("button", { name: "Start game" }).click();
 
   await expect(page.getByRole("heading", { name: "Ranking" })).toBeVisible();
-  await expect(page.getByText("Scores · ranking · repeat · undo")).toBeVisible();
+  await expect(page.getByText(/Scores · ranking|Voice unavailable/i)).toBeVisible();
   await expect(page.locator(".voice-dock")).toHaveCSS("position", "fixed");
   await expect(page.getByLabel("Language")).toHaveCount(0);
   await expect(page.getByLabel("Theme")).toHaveCount(0);

@@ -192,8 +192,6 @@ export default function NewGamePage() {
 
       <section className="setup-hero">
         <p className="eyebrow">{messages.setup.whoIsPlaying}</p>
-        <h1>{messages.setup.registerByVoice}</h1>
-        <p>{messages.setup.voiceDescription}</p>
         {(voiceActive || voiceMessage !== messages.setup.namesHint) && <p className="setup-voice-feedback" aria-live="polite">{voiceMessage}</p>}
       </section>
 

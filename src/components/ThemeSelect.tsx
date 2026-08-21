@@ -6,7 +6,7 @@ export function ThemeSelect() {
   const { theme, setTheme } = useTheme();
   return (
     <label className="theme-select">
-      <span>{messages.common.theme}</span>
+      <span aria-hidden="true">🌓</span>
       <select aria-label={messages.common.theme} value={theme} onChange={(event) => setTheme(event.target.value as ThemePreference)}>
         <option value="system">{messages.common.system}</option>
         <option value="light">{messages.common.light}</option>

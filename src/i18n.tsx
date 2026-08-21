@@ -61,6 +61,13 @@ const englishMessages = {
     deleteGameLabel: (date: string) => `Delete game from ${date}`,
     todayAt: (time: string) => `Today, ${time}`,
   },
+  footer: {
+    developedBy: "Crafted with ♡ by Thiago Guardado",
+    support: "Support",
+    donate: "Buy me a coffee",
+    contact: "Contact",
+    pix: "Pix",
+  },
   setup: {
     newGame: "New game",
     whoIsPlaying: "Who is playing?",
@@ -232,6 +239,13 @@ const portugueseMessages: Messages = {
     winner: (name, total) => `${name} venceu com ${total}`,
     gameSummary: (players, rounds) => `${players} ${players === 1 ? "jogador" : "jogadores"} · ${rounds} ${rounds === 1 ? "rodada" : "rodadas"}`,
     deleteGameConfirm: "Excluir este jogo e todas as suas rodadas? Essa ação não pode ser desfeita.", deleteGameLabel: (date) => `Excluir jogo de ${date}`, todayAt: (time) => `Hoje, ${time}`,
+  },
+  footer: {
+    developedBy: "Feito com ♡ por Thiago Guardado",
+    support: "Apoie",
+    donate: "Me pague um café",
+    contact: "Contato",
+    pix: "Pix",
   },
   setup: {
     newGame: "Novo jogo", whoIsPlaying: "Quem vai jogar?", registerByVoice: "Cadastre por voz", voiceDescription: "Pressione e segure enquanto fala os nomes dos jogadores.",

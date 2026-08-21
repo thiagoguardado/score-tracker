@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { ThemeSelect } from "../components/ThemeSelect";
@@ -21,6 +21,7 @@ export default function HomePage() {
   const { locale, messages } = useI18n();
   const { state, deleteGame, storageHealthy } = useAppStore();
   const games = [...state.games].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
     releaseMicrophoneCapture();
@@ -34,7 +35,6 @@ export default function HomePage() {
     <main className="page home-page">
       <header className="home-header">
         <div>
-          <p className="eyebrow">{messages.home.tagline}</p>
           <h1>{messages.meta.title}</h1>
         </div>
         <div className="preference-selects">
@@ -46,7 +46,7 @@ export default function HomePage() {
       {!storageHealthy && <div className="alert" role="alert">{messages.home.storageError}</div>}
 
       <button className="new-game-card" onClick={() => navigate("/games/new")}>
-        <span><strong>{messages.home.newGame}</strong><small>{messages.home.newGameSubtitle}</small></span>
+        <span><strong>🎲 {messages.home.newGame}</strong><small>{messages.home.newGameSubtitle}</small></span>
         <span className="text-arrow" aria-hidden="true">→</span>
       </button>
 
@@ -54,7 +54,7 @@ export default function HomePage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">{messages.home.savedOnDevice}</p>
-            <h2 id="history-title">{messages.home.history}</h2>
+            <h2 id="history-title">📚 {messages.home.history}</h2>
           </div>
           {games.length > 0 && <span className="count-badge">{games.length}</span>}
         </div>
@@ -89,6 +89,33 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      <footer className="app-footer" aria-label="footer">
+        <span>
+          {locale === "pt-BR" ? "Feito com ♡ por " : "Crafted with ♡ by "}
+          <a href="https://thiagoguardado.com.br/" target="_blank" rel="noopener noreferrer">
+            @thiagoguardado
+          </a>
+        </span>
+        <span aria-hidden="true">·</span>
+        <a href="https://buymeacoffee.com/thiagoguardado" target="_blank" rel="noopener noreferrer">
+          ☕ {messages.footer.donate}
+        </a>
+        <span aria-hidden="true">·</span>
+        <button
+          className="link"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText("c3786650-c84e-4fda-979f-bed9843ec978");
+              setPixCopied(true);
+              setTimeout(() => setPixCopied(false), 2000);
+            } catch {}
+          }}
+          title="c3786650-c84e-4fda-979f-bed9843ec978"
+        >
+          {pixCopied ? "✓ Pix copiado" : `♦ ${messages.footer.pix}`}
+        </button>
+      </footer>
     </main>
   );
 }

@@ -281,12 +281,15 @@ function listenOnceSingle(
 
     const recognition = new Recognition();
     recognition.lang = speechLocale(locale);
-    recognition.continuous = false;
-    recognition.interimResults = Boolean(onInterimTranscript);
+    // Hold-to-talk should keep listening while the button is held, even with pauses between names.
+    // continuous=true mirrors the former PCM gate behavior; interimResults gives live feedback.
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = preferredPhrases.length > 0 ? 5 : 1;
 
     let settled = false;
     let transcript = "";
+    let lastInterim = "";
     let terminalError: Error | null = null;
     let audioStarted = false;
     let timeout: number | undefined;
@@ -296,6 +299,8 @@ function listenOnceSingle(
     let stopVolume: (() => void) | undefined;
     let releaseSession: () => void = () => {};
     const released = new Promise<void>((release) => { releaseSession = release; });
+    const isIOSGrace = isIOSDevice();
+    const releaseGrace = isIOSGrace ? 1300 : RECOGNITION_RELEASE_GRACE_MS;
 
     const stopSynthetic = () => { stopVolume?.(); onVolume?.(0); };
     const cleanup = () => {
@@ -332,7 +337,12 @@ function listenOnceSingle(
     };
     const settleAfterEnd = () => {
       if (transcript) succeed();
-      else fail(terminalError ?? new SpeechRecognitionFailure("no-speech"));
+      else if (lastInterim) {
+        // iOS with interimResults=true often yields only interim (no final) when stop() is called
+        // while holding. Use last interim as fallback — user saw it on screen, so it is the intended text.
+        transcript = lastInterim;
+        succeed();
+      } else fail(terminalError ?? new SpeechRecognitionFailure("no-speech"));
     };
     const forceRelease = () => {
       window.clearTimeout(releaseFallback);
@@ -340,7 +350,7 @@ function listenOnceSingle(
       releaseFallback = window.setTimeout(() => {
         try { recognition.abort(); } catch {}
         abortFallback = window.setTimeout(settleAfterEnd, RECOGNITION_ABORT_GRACE_MS);
-      }, RECOGNITION_RELEASE_GRACE_MS);
+      }, releaseGrace);
     };
     const cancel = (error: Error) => {
       if (settled || terminalError) return;
@@ -413,8 +423,13 @@ function listenOnceSingle(
           const res = event.results[i];
           const candidate = preferredTranscript(res, preferredPhrases);
           if (!candidate) continue;
-          if (!res.isFinal) { onInterimTranscript?.(candidate); continue; }
+          if (!res.isFinal) {
+            lastInterim = candidate;
+            onInterimTranscript?.(candidate);
+            continue;
+          }
           transcript = candidate;
+          lastInterim = candidate;
           terminalError = null;
           window.clearTimeout(timeout);
           try { recognition.stop(); } catch {}
@@ -426,6 +441,7 @@ function listenOnceSingle(
           const candidate = r ? preferredTranscript(r, preferredPhrases) : "";
           if (!candidate) return;
           transcript = candidate;
+          lastInterim = candidate;
           terminalError = null;
           window.clearTimeout(timeout);
           try { recognition.stop(); } catch {}

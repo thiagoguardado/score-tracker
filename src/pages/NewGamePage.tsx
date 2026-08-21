@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { normalizeSpeech } from "../domain/numbers";
 import { parseSetupVoiceCommand } from "../domain/voiceParser";
 import { useI18n, type Messages } from "../i18n";
-import { finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
+import { ensureVoicePermissions, finishListening, getSpeechErrorCode, listenOnce, speak, stopAudio, supportsRecognition, useMicrophoneHealth } from "../speech";
 import { useAppStore } from "../store";
 
 type NameField = { id: string; name: string };
@@ -50,6 +50,10 @@ export default function NewGamePage() {
     }
     setVoiceMessage(messages.setup.namesHint);
   }, [locale, messages]);
+
+  useEffect(() => {
+    if (supported) void ensureVoicePermissions();
+  }, [supported]);
 
   const commitGame = (names: string[]) => {
     const id = createGame(names);
@@ -222,27 +226,33 @@ export default function NewGamePage() {
 
       <div className="voice-dock setup-voice-dock">
         <div className="voice-dock-panel">
-          <div className="voice-dock-copy" aria-hidden="true" />
+          {(voiceMessage !== messages.setup.namesHint || voiceActive) && voiceMessage && (
+            <blockquote className="dock-transcript" aria-live="polite">{voiceMessage}</blockquote>
+          )}
+          <button
+            className={`main-mic ${voiceActive ? "active" : ""}`}
+            disabled={supported ? false : true}
+            aria-label={voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              if (supported) void runVoiceSetup();
+            }}
+            onPointerUp={(event) => { event.preventDefault(); if (supported) releaseVoiceInput(); }}
+            onPointerCancel={cancelVoiceInput}
+            onLostPointerCapture={releaseVoiceInput}
+            onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat && supported) void runVoiceSetup(); }}
+            onKeyUp={(event) => { if (supported && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
+          >
+            <strong aria-hidden="true">🎤</strong>
+            <span className="sr-only">{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</span>
+            <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
+          </button>
+          <div className="voice-dock-copy">
+            <strong>{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</strong>
+            <small>{supported ? messages.setup.voiceDescription : messages.setup.voiceUnavailable}</small>
+          </div>
         </div>
-        <button
-          className={`main-mic ${voiceActive ? "active" : ""}`}
-          disabled={supported ? false : true}
-          aria-label={voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            if (supported) void runVoiceSetup();
-          }}
-          onPointerUp={(event) => { event.preventDefault(); if (supported) releaseVoiceInput(); }}
-          onPointerCancel={cancelVoiceInput}
-          onLostPointerCapture={releaseVoiceInput}
-          onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !event.repeat && supported) void runVoiceSetup(); }}
-          onKeyUp={(event) => { if (supported && (event.key === "Enter" || event.key === " ")) releaseVoiceInput(); }}
-        >
-          <strong aria-hidden="true">🎤</strong>
-          <span className="sr-only">{voiceActive ? messages.setup.endConversation : messages.setup.tellPlayers}</span>
-          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(volume, microphone.rms)})` }} /></span>
-        </button>
       </div>
 
       {!supported && <div className="voice-unavailable">{messages.setup.voiceUnavailable}</div>}

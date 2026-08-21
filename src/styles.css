@@ -158,7 +158,7 @@ h1, h2, h3 { font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", Inter, sa
 .topbar > .text-action { justify-self: start; }
 .topbar > span:last-child { justify-self: end; width: 44px; }
 
-.setup-page { padding-top: calc(98px + env(safe-area-inset-top)); padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+.setup-page { padding-top: calc(98px + env(safe-area-inset-top)); padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 .setup-hero { text-align: left; }
 .setup-hero h1 { margin-bottom: 14px; font-size: clamp(3rem, 12vw, 5rem); font-weight: 850; line-height: 0.94; }
 .setup-hero > p:not(.eyebrow) { max-width: 430px; margin: 0; color: var(--muted); line-height: 1.55; }
@@ -210,7 +210,7 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 
 .scoreboard-shell {
   min-height: calc(100vh - 82px - env(safe-area-inset-top));
-  padding: calc(106px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(150px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: calc(106px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   border-radius: 0;
   color: var(--ink);
   background: var(--background);
@@ -254,25 +254,34 @@ input { min-width: 0; min-height: 52px; padding: 0 16px; border: 0; border-radiu
 .draft-score-chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
 .draft-score-chips span { font-size: 0.76rem; }
 .draft-score-chips strong { margin-left: 4px; font-size: 1rem; }
-.voice-dock { position: fixed; z-index: 40; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); left: 12px; display: block; max-width: 680px; min-height: 112px; margin: auto; color: var(--inverse-ink); pointer-events: none; }
-.setup-voice-dock { min-height: 82px; }
-.setup-voice-dock .voice-dock-panel { min-height: 82px; padding-top: 28px; }
-.voice-dock-panel { min-height: 112px; padding: 40px 16px 12px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); pointer-events: auto; }
+.voice-dock { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 40; display: block; max-width: 680px; width: calc(100% - 24px); margin: 24px auto 0; color: var(--inverse-ink); pointer-events: auto; }
+.setup-voice-dock { min-height: auto; }
+.voice-dock-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; min-height: auto; padding: 16px 16px 18px; border: 0; border-radius: 30px; color: var(--inverse-ink); background: var(--inverse); box-shadow: var(--floating-shadow); pointer-events: auto; }
 .voice-dock strong, .voice-dock small { display: block; }
 .voice-dock strong { font-size: 0.82rem; font-weight: 900; }
 .voice-dock small { margin-top: 3px; color: currentColor; font-size: 0.66rem; line-height: 1.25; opacity: 0.68; }
-.voice-dock-copy { display: block; min-width: 0; max-width: 75%; margin: 0 auto; text-align: center; }
+.voice-dock-copy { display: block; min-width: 0; width: 100%; max-width: 100%; margin: 0 auto; text-align: center; }
 .voice-dock-copy > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.voice-dock-actions { display: flex; min-height: 30px; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; }
-.main-mic { position: absolute; z-index: 2; top: -36px; left: 50%; display: grid; width: 96px; height: 96px; min-height: 96px; align-content: center; justify-items: center; padding: 0 10px; border: 0; border-radius: 50%; color: var(--ink); background: var(--background); font-size: 0.86rem; font-weight: 900; cursor: pointer; box-shadow: 0 8px 22px rgb(0 0 0 / 18%); transform: translateX(-50%); pointer-events: auto; }
+.dock-transcript { width: 100%; max-width: 560px; margin: 0; padding: 14px 18px; border-radius: 18px; background: rgba(255,255,255,0.10); color: var(--inverse-ink); font-size: 1.05rem; font-weight: 850; line-height: 1.35; text-align: center; word-break: break-word; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+.dock-transcript:empty { display: none; }
+.dock-edit-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; width: 100%; max-width: 520px; }
+.dock-score-field { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px; border-radius: 16px; background: rgba(255,255,255,0.08); }
+.dock-score-field span { font-size: 0.75rem; font-weight: 800; opacity: 0.9; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-score-field input { width: 100%; min-height: 40px; padding: 0 8px; border: 0; border-radius: 12px; background: var(--background); color: var(--ink); font-size: 1.05rem; font-weight: 900; text-align: center; }
+.dock-score-field input:focus { outline: 2px solid rgba(255,255,255,0.9); outline-offset: 2px; }
+.voice-dock-actions { display: flex; width: 100%; min-height: auto; align-items: center; justify-content: center; gap: 12px; margin-top: 2px; flex-wrap: wrap; }
+.main-mic { position: relative; z-index: 1; display: grid; width: 96px; height: 96px; min-height: 96px; align-content: center; justify-items: center; padding: 0 10px; border: 0; border-radius: 50%; color: var(--ink); background: var(--background); font-size: 0.86rem; font-weight: 900; cursor: pointer; box-shadow: 0 8px 22px rgb(0 0 0 / 18%); pointer-events: auto; flex-shrink: 0; }
 .main-mic strong { font-size: 2.05rem; line-height: 1; filter: grayscale(1); }
 .main-mic.active { color: var(--inverse-ink); background: var(--inverse); box-shadow: inset 0 0 0 2px var(--inverse-ink), 0 8px 22px rgb(0 0 0 / 24%); }
 .main-mic:disabled { cursor: wait; }
-.manual-link { flex: 0 0 auto; min-height: 30px; padding: 0 2px; border: 0; color: currentColor; background: transparent; font-size: 0.68rem; font-weight: 850; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-.voice-dock .voice-confirm { width: auto; min-height: 30px; margin: 0; padding: 0 14px; font-size: 0.7rem; }
+.manual-link { flex: 1 1 120px; max-width: 200px; min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--radius-pill); color: var(--inverse-ink); background: rgba(255,255,255,0.14); font-size: 0.82rem; font-weight: 850; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.manual-link:hover { background: rgba(255,255,255,0.20); }
+.voice-dock .voice-confirm { flex: 1 1 140px; max-width: 220px; width: auto; min-height: 44px; margin: 0; padding: 0 18px; border: 0; border-radius: var(--radius-pill); background: var(--background); color: var(--ink); font-size: 0.85rem; font-weight: 900; box-shadow: var(--soft-shadow); }
+.voice-dock .voice-confirm:hover { opacity: 0.9; }
 .mic-progress, .mic-volume { position: absolute; right: 16px; bottom: 13px; left: 16px; height: 3px; overflow: hidden; border-radius: var(--radius-pill); background: rgb(10 10 10 / 14%); }
 .mic-progress > span, .mic-volume > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: currentColor; transform: scaleX(0); transform-origin: left center; transition: transform 70ms linear; }
 .main-mic.active .mic-volume { background: rgb(255 255 255 / 18%); }
+.dock-action { min-height: 44px; }
 
 .game-nav { display: grid; min-height: 52px; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin-bottom: 28px; padding: 4px; border: 0; border-radius: var(--radius-pill); color: var(--muted); background: var(--soft); }
 .game-nav button { min-width: 0; min-height: 44px; border: 0; border-radius: var(--radius-pill); color: inherit; background: transparent; font-size: 0.72rem; font-weight: 750; cursor: pointer; }

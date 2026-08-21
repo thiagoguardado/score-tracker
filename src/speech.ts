@@ -157,6 +157,7 @@ let keeperOsc: OscillatorNode | null = null;
 let silentAudioEl: HTMLAudioElement | null = null;
 let lastSpeakEndAt = 0;
 let hasPrimedMic = false;
+let hasRequestedPermissions = false;
 
 async function ensureAudioSession(): Promise<void> {
   if (typeof window === "undefined") return;
@@ -239,6 +240,68 @@ async function primeMicOnceIfNeeded(): Promise<void> {
   } catch {}
 }
 
+/**
+ * Try to trigger the iOS permission prompts for microphone + speech recognition
+ * as early as "enter New Game page", not only on first mic hold.
+ * Must be called from a user gesture (e.g. click "New Game") to actually show the prompt
+ * on iOS; if called outside a gesture it will just warm the AudioContext and return.
+ * Safe to call multiple times.
+ */
+export async function ensureVoicePermissions(): Promise<boolean> {
+  if (hasRequestedPermissions) return true;
+  if (!supportsRecognition()) return false;
+  hasRequestedPermissions = true;
+
+  // 1) Warm the audio session first (silent keeper) — keeps AVAudioSession warm
+  try { await ensureAudioSession(); } catch {}
+
+  // 2) Try to trigger SpeechRecognition permission via a dummy start/abort.
+  // On iOS this is what shows the "Allow Speech Recognition" system prompt.
+  // If not in a gesture, start() will throw NotAllowedError — we ignore it and
+  // the real prompt will still appear on the next real mic hold.
+  try {
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (Recognition) {
+      const r = new Recognition();
+      r.lang = "en-US";
+      r.continuous = false;
+      r.interimResults = false;
+      r.maxAlternatives = 1;
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        r.onstart = finish;
+        r.onerror = finish as unknown as (e: SpeechRecognitionErrorEvent) => void;
+        r.onend = finish;
+        try {
+          r.start();
+          setTimeout(() => { try { r.abort(); } catch {} finish(); }, 250);
+        } catch {
+          finish();
+        }
+        setTimeout(finish, 800);
+      });
+    }
+  } catch {}
+
+  // 3) Also try microphone permission via getUserMedia (shows "Allow Microphone" prompt).
+  // On iOS this is separate from speech permission.
+  if (!hasPrimedMic && navigator.mediaDevices?.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      hasPrimedMic = true;
+    } catch {
+      // If called outside gesture, this will reject with NotAllowedError — ignore,
+      // the prompt will appear on the next real mic hold via primeMicOnceIfNeeded().
+    }
+  } else {
+    hasPrimedMic = true;
+  }
+
+  return true;
+}
+
 async function waitSettleAfterSpeak(): Promise<void> {
   if (!isIOSDevice() || lastSpeakEndAt === 0) return;
   const elapsed = Date.now() - lastSpeakEndAt;
@@ -281,9 +344,7 @@ function listenOnceSingle(
 
     const recognition = new Recognition();
     recognition.lang = speechLocale(locale);
-    // Hold-to-talk should keep listening while the button is held, even with pauses between names.
-    // continuous=true mirrors the former PCM gate behavior; interimResults gives live feedback.
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = preferredPhrases.length > 0 ? 5 : 1;
 
@@ -419,29 +480,25 @@ function listenOnceSingle(
       };
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         window.clearTimeout(phantomTimer);
-        for (let i = event.resultIndex; i < event.results.length; i += 1) {
-          const res = event.results[i];
+        // Build full concatenated text to avoid truncation (shows text from start, not just last segment)
+        let fullText = "";
+        let finalOnly = "";
+        for (let i = 0; i < event.results.length; i += 1) {
+          const res = event.results[i] as SpeechRecognitionResult;
           const candidate = preferredTranscript(res, preferredPhrases);
           if (!candidate) continue;
-          if (!res.isFinal) {
-            lastInterim = candidate;
-            onInterimTranscript?.(candidate);
-            continue;
-          }
-          transcript = candidate;
-          lastInterim = candidate;
-          terminalError = null;
-          window.clearTimeout(timeout);
-          try { recognition.stop(); } catch {}
-          forceRelease();
-          return;
+          fullText += (fullText ? " " : "") + candidate;
+          if (res.isFinal) finalOnly += (finalOnly ? " " : "") + candidate;
         }
-        if (!recognition.interimResults) {
-          const r = event.results[event.resultIndex];
-          const candidate = r ? preferredTranscript(r, preferredPhrases) : "";
-          if (!candidate) return;
-          transcript = candidate;
-          lastInterim = candidate;
+        if (fullText) {
+          lastInterim = fullText;
+          onInterimTranscript?.(fullText);
+          window.clearTimeout(timeout);
+          armTimeout(MAX_UTTERANCE_MS);
+        }
+        if (finalOnly) {
+          transcript = finalOnly;
+          lastInterim = finalOnly;
           terminalError = null;
           window.clearTimeout(timeout);
           try { recognition.stop(); } catch {}

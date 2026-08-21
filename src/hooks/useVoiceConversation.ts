@@ -346,5 +346,21 @@ export function useVoiceConversation({ game, locale, onAddRound, onDeleteRound, 
     })();
   }, [game, locale, messages, onAddRound, onDeleteRound, onFinish]);
 
-  return { status, activate, release, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume, microphone };
+  const updateDraftScore = useCallback((playerId: PlayerId, raw: string) => {
+    if (!pendingScoresRef.current) return;
+    // Allow intermediate "-" or "" while typing — don't commit yet, but keep input editable via caller
+    if (raw === "" || raw === "-") return;
+    if (!/^-?\d+$/.test(raw)) return;
+    const score = Number.parseInt(raw, 10);
+    if (!Number.isSafeInteger(score)) return;
+    const next = { ...pendingScoresRef.current, [playerId]: score };
+    pendingScoresRef.current = next;
+    // If player was omitted, remove from omitted list
+    const playerName = game.players.find((p) => p.id === playerId)?.name;
+    if (playerName) omittedNamesRef.current = omittedNamesRef.current.filter((n) => n !== playerName);
+    updateStatus("awaiting-decision", messages.voice.roundReady, statusRef.current.transcript, next);
+    setConfirmationPending(true);
+  }, [game.players, messages]);
+
+  return { status, activate, release, cancel, confirmPending, confirmationPending, waitingForTap, supported: supportsRecognition(), volume, microphone, updateDraftScore };
 }

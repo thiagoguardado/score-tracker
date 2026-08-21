@@ -15,14 +15,17 @@ test("creates, scores, persists, and finishes a game", async ({ page }) => {
   // Native SpeechRecognition has no model download phase — mic is ready immediately.
   await expect(setupMic).toBeVisible();
   await expect(setupMic).toHaveAccessibleName(/Hold to say players|Segure para dizer/i);
-  await expect(page.locator(".setup-voice-dock")).toHaveCSS("position", "fixed");
+  // Dock is sticky at the end of the page flow so the Start button can be scrolled above it
+  await expect(page.locator(".setup-voice-dock")).toHaveCSS("position", "sticky");
   await page.getByLabel("Player 1 name").fill("Thiago");
   await page.getByLabel("Player 2 name").fill("Mario");
+  // Start button must be reachable by scrolling past the sticky dock
+  await expect(page.getByRole("button", { name: "Start game" })).toBeVisible();
   await page.getByRole("button", { name: "Start game" }).click();
 
   await expect(page.getByRole("heading", { name: "Ranking" })).toBeVisible();
   await expect(page.getByText(/Scores · ranking|Voice unavailable/i)).toBeVisible();
-  await expect(page.locator(".voice-dock")).toHaveCSS("position", "fixed");
+  await expect(page.locator(".voice-dock")).toHaveCSS("position", "sticky");
   await expect(page.getByLabel("Language")).toHaveCount(0);
   await expect(page.getByLabel("Theme")).toHaveCount(0);
   await page.getByRole("button", { name: "Type" }).click();

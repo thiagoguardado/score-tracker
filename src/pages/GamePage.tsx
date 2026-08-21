@@ -225,6 +225,15 @@ export default function GamePage() {
   const emptyGame: Game = { id: "", startedAt: "", status: "active", players: [], rounds: [] };
   const voice = useVoiceConversation({ game: game ?? emptyGame, locale, onAddRound, onDeleteRound, onFinish });
   const ranking = useMemo(() => game ? rankingFor(game, game.rounds, locale) : [], [game, locale]);
+  const [dockInputs, setDockInputs] = useState<Record<PlayerId, string>>({});
+
+  useEffect(() => {
+    if (voice.status.draftScores) {
+      setDockInputs(Object.fromEntries(Object.entries(voice.status.draftScores).map(([id, v]) => [id, String(v)])));
+    } else {
+      setDockInputs({});
+    }
+  }, [voice.status.draftScores]);
 
   useEffect(() => {
     if (game?.status === "finished") releaseMicrophoneCapture();
@@ -233,7 +242,6 @@ export default function GamePage() {
   if (!game) return <Navigate to="/" replace />;
   const canEdit = game.status === "active" || editingFinished;
   const voiceActive = voice.status.phase === "starting" || voice.status.phase === "listening";
-  const showVoiceCard = voice.status.phase !== "idle" || voice.confirmationPending;
 
   const share = async () => {
     const text = shareText(game, locale);
@@ -294,16 +302,7 @@ export default function GamePage() {
         {panel === "history" && <HistoryPanel game={game} canEdit={canEdit} updateRound={(roundId, scores) => updateRound(game.id, roundId, scores)} deleteRound={(roundId) => deleteRound(game.id, roundId)} />}
         {panel === "players" && <PlayersPanel game={game} canEdit={canEdit} renamePlayer={(playerId, name) => renamePlayer(game.id, playerId, name)} addPlayer={(name) => addPlayer(game.id, name)} removePlayer={(playerId) => removePlayer(game.id, playerId)} />}
 
-        {game.status === "active" && panel === "ranking" && showVoiceCard && <>
-          <section className={`voice-card phase-${voice.status.phase}`} aria-live="polite">
-            <div className="voice-status-line"><strong>{currentPhase}</strong></div>
-            <p>{voice.status.message}</p>
-            {voice.status.transcript && <blockquote>“{voice.status.transcript}”</blockquote>}
-            {voice.status.draftScores && <div className="draft-score-chips">
-              {game.players.map((player) => <span key={player.id}>{player.name} <strong>{voice.status.draftScores?.[player.id] ?? 0}</strong></span>)}
-            </div>}
-          </section>
-        </>}
+
 
         {game.status === "finished" && panel === "ranking" && <div className="result-actions">
           <button className="primary-button" onClick={() => void share()}>{messages.game.shareResult}</button>
@@ -313,35 +312,74 @@ export default function GamePage() {
 
       {game.status === "active" && <div className="voice-dock">
         <div className="voice-dock-panel">
+          {(voice.status.transcript || voiceActive) && (
+            <blockquote className="dock-transcript" aria-live="polite">
+              {voice.status.transcript ? `“${voice.status.transcript}”` : messages.voice.listening}
+            </blockquote>
+          )}
+          {voice.status.draftScores && (
+            <div className="dock-edit-scores">
+              {game.players.map((player) => (
+                <label key={player.id} className="dock-score-field">
+                  <span>{player.name}</span>
+                  <input
+                    aria-label={`${player.name} score`}
+                    inputMode="numeric"
+                    pattern="-?[0-9]*"
+                    value={dockInputs[player.id] ?? String(voice.status.draftScores?.[player.id] ?? 0)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^-?\d*$/.test(v)) {
+                        setDockInputs((cur) => ({ ...cur, [player.id]: v }));
+                        if (v !== "" && v !== "-") voice.updateDraftScore(player.id, v);
+                      }
+                    }}
+                    onBlur={() => {
+                      const v = dockInputs[player.id] ?? "";
+                      if (!/^-?\d+$/.test(v)) {
+                        setDockInputs((cur) => ({ ...cur, [player.id]: String(voice.status.draftScores?.[player.id] ?? 0) }));
+                      }
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+          {voice.status.draftScores ? (
+            <div className="voice-dock-actions">
+              <button className="manual-link dock-action" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
+              <button className="voice-confirm dock-action" onClick={voice.confirmPending}>{messages.common.confirm}</button>
+            </div>
+          ) : (
+            <div className="voice-dock-actions">
+              <button className="manual-link dock-action" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
+            </div>
+          )}
+          <button
+            className={`main-mic ${voiceActive ? "active" : ""}`}
+            aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              voice.activate();
+            }}
+            onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
+            onPointerCancel={voice.cancel}
+            onLostPointerCapture={() => voice.release()}
+            onKeyDown={(event) => {
+              if ((event.key === "Enter" || event.key === " ") && !event.repeat) voice.activate();
+            }}
+            onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
+          >
+            <strong aria-hidden="true">🎤</strong>
+            <span className="sr-only">{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
+            <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
+          </button>
           <div className="voice-dock-copy">
             <strong>{voiceActive ? currentPhase : messages.game.talkToScoreboard}</strong>
             <small>{voice.supported ? messages.game.commandHint : messages.game.voiceUnavailable}</small>
-            <div className="voice-dock-actions">
-              <button className="manual-link" onClick={() => setManualOpen(true)}>{messages.game.type}</button>
-              {voice.confirmationPending && <button className="voice-confirm" onClick={voice.confirmPending}>{messages.common.confirm}</button>}
-            </div>
           </div>
         </div>
-        <button
-          className={`main-mic ${voiceActive ? "active" : ""}`}
-          aria-label={voiceActive ? messages.setup.endConversation : messages.game.talkToScoreboard}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            voice.activate();
-          }}
-          onPointerUp={(event) => { event.preventDefault(); voice.release(); }}
-          onPointerCancel={voice.cancel}
-          onLostPointerCapture={() => voice.release()}
-          onKeyDown={(event) => {
-            if ((event.key === "Enter" || event.key === " ") && !event.repeat) voice.activate();
-          }}
-          onKeyUp={(event) => { if (event.key === "Enter" || event.key === " ") voice.release(); }}
-        >
-          <strong aria-hidden="true">🎤</strong>
-          <span className="sr-only">{voiceActive ? messages.game.stopVoice : messages.game.startVoice}</span>
-          <span className="mic-volume" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(voice.volume, voice.microphone.rms)})` }} /></span>
-        </button>
       </div>}
 
       {manualOpen && <ScoreForm game={game} title={messages.game.addRound} onClose={() => setManualOpen(false)} onSave={(scores) => { addRound(game.id, scores, "manual"); setManualOpen(false); }} />}
